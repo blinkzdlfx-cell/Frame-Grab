@@ -64,7 +64,7 @@ function openDatabase(): Promise<IDBDatabase> {
         const row = cursor.value as StoredFrame & { projectId?: string; index?: number };
         if (!row.projectId) {
           row.projectId = "legacy-recovered";
-          row.index = row.index ?? cursor.key as number;
+          row.index = row.index ?? 0;
           cursor.update(row);
         }
         cursor.continue();
