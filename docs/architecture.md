@@ -8,7 +8,7 @@
 - Cloudflare Workers serves static assets only. Video and screenshot processing never pass through the Worker.
 - IndexedDB stores project metadata, settings, recovery checkpoints, screenshot Blobs, and a temporary source-video Blob while a project is a draft or extraction is active/paused.
 - A completed project's source-video Blob is automatically removed. Screenshots and project metadata remain available.
-- The storage layer is provider-oriented: local IndexedDB is the only provider in this release. Cloud backup, accounts, authentication, and the planned per-account 500 MB backup allowance are deferred; no cloud upload is performed.
+- IndexedDB is the only storage implementation in this release. There is no cloud-storage provider abstraction or remote backup integration yet. Accounts, authentication, cloud backup, and the planned per-account 500 MB backup allowance are deferred; no cloud upload is performed.
 
 ## Project lifecycle
 
