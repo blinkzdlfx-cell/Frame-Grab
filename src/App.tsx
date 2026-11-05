@@ -17,6 +17,7 @@ const defaultSettings: ProjectSettings = { mode: "interval", interval: 2, target
 const makeId = () => `project-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
 const safeTitle = (name: string) => name.replace(/\.[^.]+$/, "").replace(/[_-]+/g," ").trim() || "Untitled project";
 const storageMessage = (error: unknown) => error instanceof Error ? error.message : "Browser storage is unavailable. Your current session can continue, but recovery may not be possible.";
+const projectSummary = (p:StoredProject):StoredProject => { const copy={...p}; delete copy.sourceBlob; return copy; };
 
 export default function App() {
   const videoRef=useRef<HTMLVideoElement>(null), canvasRef=useRef<HTMLCanvasElement>(null), fileInputRef=useRef<HTMLInputElement>(null);
@@ -74,7 +75,7 @@ export default function App() {
     if(!project)return;
     const timer=window.setTimeout(()=>{
       const updated={...project,settings,duration,width:dimensions.width,height:dimensions.height};
-      void saveProject(updated).then(()=>{setProject(updated);setProjects(list=>list.map(p=>p.id===updated.id?updated:p));}).catch(error=>setNotice(storageMessage(error)));
+      void saveProject(updated).then(()=>{setProject(updated);setProjects(list=>list.map(p=>p.id===updated.id?projectSummary(updated):p));}).catch(error=>setNotice(storageMessage(error)));
     },350);
     return()=>window.clearTimeout(timer);
   },[settings,duration,dimensions.width,dimensions.height]);
