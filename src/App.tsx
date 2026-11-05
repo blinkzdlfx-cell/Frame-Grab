@@ -112,7 +112,7 @@ export default function App() {
     if(!nextFile)return;
     if(!nextFile.type.startsWith("video/")){setNotice("Please choose a supported video file.");return;}
     if(processing){setNotice("Wait for the current extraction to finish or cancel it before opening another project.");return;}
-    const estimate=await getStorageEstimate().catch(()=>({}));
+    const estimate=await getStorageEstimate().catch((): {usage?:number;quota?:number;persistent?:boolean} => ({}));
     const available=estimate.quota!==undefined&&estimate.usage!==undefined?Math.max(0,estimate.quota-estimate.usage):undefined;
     if(available!==undefined&&nextFile.size>available){
       const proceed=window.confirm(`This video is ${formatBytes(nextFile.size)}, but the browser estimates only ${formatBytes(available)} available. Saving it may fail. Continue with this video for this session?`);
@@ -164,7 +164,7 @@ export default function App() {
   async function removeVideo(){
     if(!project)return;
     if(!window.confirm("Remove the original video from this project? Existing screenshots and settings will remain."))return;
-    try{await removeSourceVideo(project.id);const updated={...project,sourceBlob:undefined,status:project.status==="completed"?"completed":"needs-source" as const};setProject(updated);setProjects(list=>list.map(p=>p.id===updated.id?updated:p));if(videoUrl)URL.revokeObjectURL(videoUrl);setVideoUrl("");setFile(null);setNotice("Original video removed. Screenshots and project settings are preserved.");}
+    try{await removeSourceVideo(project.id);const updated:StoredProject={...project,sourceBlob:undefined,status:project.status==="completed"?"completed":"needs-source"};setProject(updated);setProjects(list=>list.map(p=>p.id===updated.id?projectSummary(updated):p));if(videoUrl)URL.revokeObjectURL(videoUrl);setVideoUrl("");setFile(null);setNotice("Original video removed. Screenshots and project settings are preserved.");}
     catch(error){setNotice(storageMessage(error));}
     await refreshStorage();
   }
