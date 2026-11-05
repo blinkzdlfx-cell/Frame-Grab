@@ -120,6 +120,17 @@ export default function App() {
       const proceed=window.confirm(`This is a large video (${formatBytes(nextFile.size)}). Saving a temporary recovery copy uses browser storage until extraction finishes. Continue?`);
       if(!proceed)return;
     }
+    if(project?.status==="needs-source" && project.sourceName===nextFile.name){
+      const url=URL.createObjectURL(nextFile);
+      try{
+        await saveSourceVideo(project.id,nextFile);
+        const restored={...project,sourceBlob:nextFile,status:project.plannedTimestamps.length?"paused" as const:"draft" as const};
+        setProject(restored);setFile(nextFile);setVideoUrl(url);
+        if(restored.nextIndex>0)resumeRef.current=true;
+        setNotice("Original video reconnected to the existing project. Its saved screenshots and progress are preserved.");
+        await reloadProjects();return;
+      }catch(error){URL.revokeObjectURL(url);setNotice(storageMessage(error));return;}
+    }
     if(videoUrl)URL.revokeObjectURL(videoUrl);
     framesRef.current.forEach(f=>URL.revokeObjectURL(f.url));
     replaceFrames([]);setDuration(0);setDimensions({width:0,height:0});setPreviewIndex(null);
@@ -195,7 +206,7 @@ export default function App() {
     cancelRef.current=false;setProcessing(true);
     const previousMuted=video.muted;video.pause();video.muted=true;
     let skipped=project.skipped||0;\n    let nextIndex=start;
-    const initial={...project,status:"processing" as const,plannedTimestamps:plan,nextIndex:start,skipped};
+    const initial={...project,settings,duration,width:dimensions.width,height:dimensions.height,status:"processing" as const,plannedTimestamps:plan,nextIndex:start,skipped};
     setProject(initial);
     try{await saveProject(initial);}catch(error){setNotice(storageMessage(error));}
     setProgress({done:start,total:plan.length,skipped,time:plan[Math.max(0,start-1)]||0,status:resume?"Resuming extraction…":"Preparing video…"});
@@ -286,7 +297,7 @@ export default function App() {
           <div className="custom-time"><div><label>Specific timestamp <span>Optional</span></label><p>Add an exact moment in seconds</p></div><div className="custom-time-control"><input type="number" min="0" max={duration||undefined} step=".1" placeholder="e.g. 12.5" value={customTime} onChange={e=>setCustomTime(e.target.value)} disabled={!file||!duration}/><button onClick={addCustomTime} disabled={!file||!duration}><Plus size={15}/> Add</button></div>{settings.customTimes.length>0&&<div className="timestamp-chips">{settings.customTimes.map(t=><button key={t} onClick={()=>setSettings(s=>({...s,customTimes:s.customTimes.filter(x=>x!==t)}))}>{formatTime(t,true)} <X size={11}/></button>)}</div>}</div>
           <div className="options-row"><div className="toggle-line"><span><Sparkles size={16}/><span><b>Automatic clarity filter</b><small>Blurry frames are discarded automatically</small></span></span><span className="ready-tag"><Check size={13}/> ON</span></div></div>
           <div className="format-grid"><div><label className="setting-label" htmlFor="format">Image format</label><select id="format" value={settings.format} onChange={e=>setSettings(s=>({...s,format:e.target.value}))}><option value="image/jpeg">JPEG · Smaller files</option><option value="image/png">PNG · Lossless</option></select></div><div><label className="setting-label" htmlFor="quality">JPEG quality <strong>{Math.round(settings.quality*100)}%</strong></label><input id="quality" type="range" min=".5" max="1" step=".05" value={settings.quality} disabled={settings.format!=="image/jpeg"} onChange={e=>setSettings(s=>({...s,quality:Number(e.target.value)}))}/></div></div>
-          <button className="primary-button" disabled={!file||!duration||processing||!timestamps.length} onClick={()=>void extractFrames(false)}>{processing?<><LoaderCircle className="spin" size={17}/> Extracting…</>:<><Scissors size={17}/> {project?.status==="paused"?"Resume extraction":project?.status==="completed"?"Extract again":`Extract ${timestamps.length} screenshots`} <ArrowDownToLine size={16}/></>}</button>
+          <button className="primary-button" disabled={!file||!duration||processing||!timestamps.length} onClick={()=>void extractFrames(project?.status==="paused"||project?.status==="processing")}>{processing?<><LoaderCircle className="spin" size={17}/> Extracting…</>:<><Scissors size={17}/> {project?.status==="paused"?"Resume extraction":project?.status==="completed"?"Extract again":`Extract ${timestamps.length} screenshots`} <ArrowDownToLine size={16}/></>}</button>
           <p className="settings-footnote"><LockKeyhole size={13}/> Files are processed locally. Nothing is uploaded.</p>
         </div>
       </section>
