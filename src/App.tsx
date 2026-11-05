@@ -6,6 +6,7 @@ import {
   Scissors, ShieldCheck, Sparkles, UploadCloud, X, Zap
 } from "lucide-react";
 import { calculateSharpness, canvasToBlob, formatBytes, formatTime, getFrameTimestamps, seekVideo } from "./lib/video";
+import { clearStoredFrames, loadStoredFrames, saveStoredFrame, updateStoredFrameSelection } from "./lib/storage";
 
 type Frame = {
   id: string;
@@ -16,6 +17,7 @@ type Frame = {
   height: number;
   sharpness: number;
   selected: boolean;
+  format: string;
 };
 
 type Mode = "interval" | "target";
@@ -54,6 +56,22 @@ export default function App() {
   const estimatedCount = file ? timestamps.length : 0;
 
   useEffect(() => { framesRef.current = frames; }, [frames]);
+
+  useEffect(() => {
+    let active = true;
+    loadStoredFrames().then((stored) => {
+      if (!active || !stored.length) return;
+      const restored: Frame[] = stored.map((frame) => ({
+        ...frame,
+        url: URL.createObjectURL(frame.blob)
+      }));
+      setFrames(restored);
+      setNotice(`Restored ${restored.length} saved screenshot(s) from this device.`);
+    }).catch(() => {
+      if (active) setNotice("Local gallery storage is unavailable in this browser.");
+    });
+    return () => { active = false; };
+  }, []);
   useEffect(() => { videoUrlRef.current = videoUrl; }, [videoUrl]);
   useEffect(() => {
     return () => {
@@ -77,8 +95,9 @@ export default function App() {
   }, []);
 
   function clearFrames() {
-    frames.forEach((frame) => URL.revokeObjectURL(frame.url));
+    framesRef.current.forEach((frame) => URL.revokeObjectURL(frame.url));
     setFrames([]);
+    void clearStoredFrames().catch(() => setNotice("Could not clear the locally saved gallery."));
   }
 
   function loadFile(nextFile?: File) {
@@ -131,6 +150,9 @@ export default function App() {
     setProcessing(true);
     setProgress({ done: 0, total: timestamps.length, skipped: 0, time: 0, status: "Preparing video…" });
     const results: Frame[] = [];
+    const previousMuted = video.muted;
+    video.pause();
+    video.muted = true;
     let skipped = 0;
     try {
       for (let index = 0; index < timestamps.length; index += 1) {
@@ -160,9 +182,15 @@ export default function App() {
           width,
           height,
           sharpness,
-          selected: true
+          selected: true,
+          format
         };
         results.push(frame);
+        try {
+          await saveStoredFrame({ id: frame.id, timestamp: frame.timestamp, blob: frame.blob, width, height, sharpness, selected: true, format });
+        } catch {
+          setNotice("Screenshots were created, but this browser could not save them for recovery after refresh.");
+        }
         setProgress((current) => ({ ...current, done: index + 1, skipped }));
         setFrames([...results]);
         await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
@@ -175,19 +203,30 @@ export default function App() {
     } finally {
       setProcessing(false);
       cancelRef.current = false;
-      if (video) video.pause();
+      if (video) { video.pause(); video.muted = previousMuted; }
     }
   }
 
   function toggleFrame(id: string) {
-    setFrames((current) => current.map((frame) => frame.id === id ? { ...frame, selected: !frame.selected } : frame));
+    const frame = framesRef.current.find((item) => item.id === id);
+    if (!frame) return;
+    const selected = !frame.selected;
+    setFrames((current) => current.map((item) => item.id === id ? { ...item, selected } : item));
+    void updateStoredFrameSelection(id, selected);
+  }
+
+  function setAllFramesSelected(selected: boolean) {
+    setFrames((current) => current.map((frame) => ({ ...frame, selected })));
+    void Promise.all(framesRef.current.map((frame) => updateStoredFrameSelection(frame.id, selected)));
   }
 
   function downloadFrame(frame: Frame) {
     const link = document.createElement("a");
     link.href = frame.url;
-    link.download = `framegrab-${formatTime(frame.timestamp).replaceAll(":", "-")}-${Math.round(frame.timestamp * 1000)}ms.${format === "image/png" ? "png" : "jpg"}`;
+    link.download = `framegrab-${formatTime(frame.timestamp).replaceAll(":", "-")}-${Math.round(frame.timestamp * 1000)}ms.${frame.format === "image/png" ? "png" : "jpg"}`;
+    document.body.appendChild(link);
     link.click();
+    link.remove();
   }
 
   async function downloadZip() {
@@ -201,14 +240,16 @@ export default function App() {
         const timestamp = formatTime(frame.timestamp, true).replaceAll(":", "-").replace(".", "-");
         zip.file(`frame-${String(index + 1).padStart(3, "0")}-${timestamp}.${extension}`, frame.blob);
       });
-      const blob = await zip.generateAsync({ type: "blob", compression: "STORE" });
+      const blob = await zip.generateAsync({ type: "blob", compression: "STORE", streamFiles: true });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = `framegrab-${selected.length}-frames.zip`;
+      document.body.appendChild(link);
       link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-      setNotice(`ZIP ready: ${selected.length} image(s).`);
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setNotice(`ZIP prepared with ${selected.length} images. If the download does not start, allow downloads for this site and try again.`);
     } catch {
       setNotice("Could not create the ZIP file. Try downloading fewer images.");
     } finally {
@@ -224,7 +265,7 @@ export default function App() {
         <div className="topbar-inner">
           <a className="brand" href="/" aria-label="FrameGrab home">
             <span className="brand-mark"><Film size={21} /></span>
-            <span><strong>FrameGrab</strong><small>VIDEO FRAME EXTRACTOR</small></span>
+            <span><strong>FrameGrab</strong><small>BY BRILINA DEV</small></span>
           </a>
           <div className="privacy-pill"><span className="live-dot" /> <span>100% on-device processing</span></div>
         </div>
@@ -329,7 +370,7 @@ export default function App() {
           <section className="gallery-section">
             <div className="gallery-header">
               <div><span className="step-number">03</span><div><h2>Your screenshots</h2><p>{frames.length} captured · {selectedCount} selected</p></div></div>
-              <div className="gallery-actions"><button className="secondary-button" onClick={() => setFrames((current) => current.map((frame) => ({ ...frame, selected: true })))}><CheckCheck size={14} /> Select all</button><button className="secondary-button" onClick={() => setFrames((current) => current.map((frame) => ({ ...frame, selected: false })))}>Clear</button><button className="download-button" disabled={!selectedCount || zipping} onClick={downloadZip}>{zipping ? <LoaderCircle className="spin" size={15} /> : <Archive size={15} />} Download ZIP ({selectedCount})</button></div>
+              <div className="gallery-actions"><button className="secondary-button" onClick={() => setAllFramesSelected(true)}><CheckCheck size={14} /> Select all</button><button className="secondary-button" onClick={() => setAllFramesSelected(false)}>Clear selection</button><button className="secondary-button" onClick={clearFrames}>Delete gallery</button><button className="download-button" disabled={!selectedCount || zipping} onClick={downloadZip}>{zipping ? <LoaderCircle className="spin" size={15} /> : <Archive size={15} />} Download ZIP ({selectedCount})</button></div>
             </div>
             <div className="frames-grid">
               {frames.map((frame, index) => (
@@ -343,7 +384,7 @@ export default function App() {
         )}
 
         {!file && <section className="trust-row"><div><ShieldCheck size={17} /><span><b>Private by design</b><small>Your files never leave your device</small></span></div><div><Zap size={17} /><span><b>Fast local processing</b><small>No upload or server queue</small></span></div><div><Archive size={17} /><span><b>Easy export</b><small>Save images individually or as ZIP</small></span></div></section>}
-        <footer><span>FRAMEGRAB</span><span>Private video frame extraction · Built for your browser</span></footer>
+        <footer><span>FRAMEGRAB · BRILINA DEV</span><span>Private video frame extraction · Built for your browser</span></footer>
       </main>
 
       {previewFrame && <div className="preview-overlay" onClick={() => setPreviewFrame(null)}><div className="preview-dialog" onClick={(event) => event.stopPropagation()}><div className="preview-toolbar"><span>{formatTime(previewFrame.timestamp, true)} <small>· {previewFrame.width} × {previewFrame.height}</small></span><div><button onClick={() => downloadFrame(previewFrame)}><ArrowDownToLine size={15} /> Save image</button><button className="close-preview" onClick={() => setPreviewFrame(null)} aria-label="Close preview"><X size={20} /></button></div></div><img src={previewFrame.url} alt="Full-size extracted video frame" /></div></div>}
