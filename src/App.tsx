@@ -202,7 +202,7 @@ export default function App() {
     if(!plan.length)return;
     cancelRef.current=false;activeRef.current=true;setProcessing(true);
     const previousMuted=video.muted;video.pause();video.muted=true;
-    let skipped=project.skipped||0;
+    let skipped=project.skipped||0;\n    let nextIndex=start;
     const initial={...project,status:"processing" as const,plannedTimestamps:plan,nextIndex:start,skipped};
     setProject(initial);
     try{await saveProject(initial);}catch(error){setNotice(storageMessage(error));}
@@ -234,8 +234,8 @@ export default function App() {
         await new Promise<void>(resolve=>window.setTimeout(resolve,0));
       }
       if(cancelRef.current){
-        const paused={...initial,nextIndex:progress.done,skipped,status:"paused" as const};
-        await saveProject(paused);setProject(paused);setNotice("Extraction paused. Your saved screenshots and recovery point are محفوظ.");
+        const paused={...initial,nextIndex,skipped,status:"paused" as const};
+        await saveProject(paused);setProject(paused);setNotice("Extraction paused. Your saved screenshots and recovery point are preserved.");
       }else{
         const completed={...initial,nextIndex:plan.length,skipped,status:"completed" as const};
         await saveProject(completed);await removeSourceVideo(project.id).catch(()=>undefined);
