@@ -1,17 +1,43 @@
 # FrameGrab
 
-A privacy-focused, browser-based video frame extractor. Select a video, choose an interval or target frame count, and export the captured images individually or as a ZIP. Video decoding and frame extraction happen locally in the browser; the application does not upload video files to a server.
+FrameGrab is a privacy-focused, browser-based video frame extractor. It turns a local video into a set of still images without requiring manual screenshots, cropping, or a media upload service.
+
+Select a video, choose an extraction method, review the captured frames, and download individual images or a ZIP archive. Video decoding and frame extraction happen locally in the browser.
 
 ## Features
 
+### Video extraction
 - Local video preview and metadata detection
-- Time-interval and target-count extraction modes
-- Additional exact timestamps (in seconds)
-- Optional best-effort blur filtering
-- JPEG/PNG export with adjustable JPEG quality
-- Sequential frame processing with progress and cancellation
-- Selectable frame gallery, full-size preview, individual downloads, and ZIP export
-- Responsive layout for mobile and desktop
+- Extract frames at a time interval or target frame count
+- Add exact timestamps in seconds
+- Best-effort sharpness filtering to skip some blurry frames
+- Export as JPEG or PNG, with adjustable JPEG quality
+- Sequential processing with progress reporting and cancellation
+
+### Projects and gallery
+- Keep separate extraction projects with editable project names
+- Browse each project's saved screenshots
+- Preview images at full size and navigate in extraction order
+- Select and download individual images or export a project's selection as a ZIP
+- Delete individual images or entire projects
+
+### Local storage and recovery
+- Save projects, settings, screenshots, and extraction checkpoints in browser IndexedDB
+- Restore saved projects after a page refresh when browser storage is available
+- Resume interrupted extraction when its temporary source video is still available
+- Remove the original video manually, or let FrameGrab remove it automatically after successful extraction
+- View estimated browser storage usage and quota where supported
+- Receive a confirmation before saving large source videos and a warning when estimated free space may be insufficient
+
+## Important storage notes
+
+FrameGrab stores project data in the browser on the current device. It does not currently provide accounts, cloud backup, or cross-device synchronization.
+
+Browser storage is not guaranteed permanent storage. A browser or device can clear or evict site data, private browsing may restrict storage, and the browser may deny a persistent-storage request. The displayed usage and quota are estimates supplied by the browser, not a guaranteed allocation.
+
+If a project says its source video is needed, select the original video again to continue or resume. Removing the source video does not delete screenshots already saved in the project.
+
+Cloud backup and the proposed 500 MB per-account allowance are future work and are not part of the current release.
 
 ## Development
 
@@ -41,10 +67,12 @@ npm run deploy
 
 The first deployment may ask you to create or select the Cloudflare account.
 
-## Browser support notes
+## Browser and file compatibility
 
-Actual video decoding depends on the codecs supported by the user's browser and device. MP4 with H.264 video is the safest general recommendation. MOV/HEVC and AVI support varies. The app intentionally does not claim that every container/codec combination is supported.
+Video decoding depends on the codecs supported by the browser and device. MP4 with H.264 video is generally the safest recommendation, but support still varies by browser. MOV/HEVC and AVI support is not universal. A file extension alone does not guarantee that a video can be decoded.
+
+Frame extraction and ZIP generation run in the browser. Very large videos, large image collections, or large ZIP exports can use substantial device memory and storage. The sharpness filter is heuristic; it cannot guarantee that every retained frame is perfectly sharp.
 
 ## Privacy
 
-Video files are read with the browser File API and decoded by the local HTML video element. Extracted images and ZIP archives are generated in browser memory. No API, database, account, or server-side media processing is used.
+Video files are read through the browser File API and decoded by the local HTML video element. Extracted images and ZIP archives are generated locally. The application does not upload videos or screenshots to a server in the current release.
