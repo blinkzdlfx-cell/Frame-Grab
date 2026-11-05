@@ -116,7 +116,7 @@ export async function listProjects(): Promise<StoredProject[]> {
       req.onsuccess = () => resolve(req.result as StoredProject[]);
       req.onerror = () => reject(req.error);
     });
-    return result.map(project => { const { sourceBlob: _sourceBlob, ...metadata } = project; return metadata; }).sort((a,b) => b.updatedAt-a.updatedAt);
+    return result.map(project => { const metadata = { ...project }; delete metadata.sourceBlob; return metadata; }).sort((a,b) => b.updatedAt-a.updatedAt);
   });
 }
 export async function getProject(id: string): Promise<StoredProject | undefined> {
