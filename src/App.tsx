@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import {
-  Archive, ArrowDownToLine, Check, CheckCheck, ChevronDown, Clapperboard, Clock3,
+  Archive, ArrowDownToLine, Check, CheckCheck, Clock3,
   FileVideo2, Film, Image as ImageIcon, LoaderCircle, LockKeyhole, Plus, RotateCcw,
   Scissors, ShieldCheck, Sparkles, UploadCloud, X, Zap
 } from "lucide-react";
@@ -25,6 +25,8 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef(false);
+  const framesRef = useRef<Frame[]>([]);
+  const videoUrlRef = useRef("");
   const [file, setFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [duration, setDuration] = useState(0);
@@ -52,12 +54,14 @@ export default function App() {
   const selectedCount = frames.filter((frame) => frame.selected).length;
   const estimatedCount = file ? timestamps.length : 0;
 
+  useEffect(() => { framesRef.current = frames; }, [frames]);
+  useEffect(() => { videoUrlRef.current = videoUrl; }, [videoUrl]);
   useEffect(() => {
     return () => {
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
-      frames.forEach((frame) => URL.revokeObjectURL(frame.url));
+      if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
+      framesRef.current.forEach((frame) => URL.revokeObjectURL(frame.url));
     };
-  }, [videoUrl, frames]);
+  }, []);
 
   useEffect(() => {
     if (!notice) return;
@@ -142,7 +146,7 @@ export default function App() {
         canvas.width = width;
         canvas.height = height;
         context.drawImage(video, 0, 0, width, height);
-        const sharpness = calculateSharpness(canvas, context);
+        const sharpness = calculateSharpness(canvas);
         if (blurFilter && sharpness < 13) {
           skipped += 1;
           setProgress((current) => ({ ...current, done: index + 1, skipped }));

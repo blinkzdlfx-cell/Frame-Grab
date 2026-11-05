@@ -52,7 +52,7 @@ export async function seekVideo(video: HTMLVideoElement, time: number): Promise<
   }
 }
 
-export function calculateSharpness(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D): number {
+export function calculateSharpness(canvas: HTMLCanvasElement): number {
   const width = Math.min(canvas.width, 160);
   const height = Math.max(1, Math.round(canvas.height * (width / canvas.width)));
   const sample = document.createElement("canvas");
