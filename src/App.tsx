@@ -13,7 +13,6 @@ import {
 } from "./lib/storage";
 
 type Frame = StoredFrame & { url: string };
-type Mode = "interval" | "target";
 const defaultSettings: ProjectSettings = { mode: "interval", interval: 2, targetCount: 15, format: "image/jpeg", quality: .88, customTimes: [] };
 const makeId = () => `project-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
 const safeTitle = (name: string) => name.replace(/\.[^.]+$/, "").replace(/[_-]+/g," ").trim() || "Untitled project";
@@ -21,7 +20,7 @@ const storageMessage = (error: unknown) => error instanceof Error ? error.messag
 
 export default function App() {
   const videoRef=useRef<HTMLVideoElement>(null), canvasRef=useRef<HTMLCanvasElement>(null), fileInputRef=useRef<HTMLInputElement>(null);
-  const cancelRef=useRef(false), previewTouch=useRef<{x:number;y:number}|null>(null), resumeRef=useRef(false), activeRef=useRef(false);
+  const cancelRef=useRef(false), previewTouch=useRef<{x:number;y:number}|null>(null), resumeRef=useRef(false);
   const [projects,setProjects]=useState<StoredProject[]>([]);
   const [project,setProject]=useState<StoredProject|null>(null);
   const [file,setFile]=useState<File|null>(null), [videoUrl,setVideoUrl]=useState("");
@@ -144,13 +143,6 @@ export default function App() {
     }
     await reloadProjects();
   }
-  async function saveCurrentProject(patch:Partial<StoredProject>){
-    if(!project)return;
-    const updated={...project,...patch,updatedAt:Date.now()};
-    setProject(updated);
-    setProjects(list=>list.map(p=>p.id===updated.id?updated:p));
-    try{await saveProject(updated);}catch(error){setNotice(storageMessage(error));}
-  }
   async function renameProject(title:string){
     if(!project)return;
     const updated={...project,title:title.trim()||"Untitled project",updatedAt:Date.now()};
@@ -200,7 +192,7 @@ export default function App() {
     const plan=resume&&project.plannedTimestamps.length?project.plannedTimestamps:timestamps;
     const start=resume?project.nextIndex:0;
     if(!plan.length)return;
-    cancelRef.current=false;activeRef.current=true;setProcessing(true);
+    cancelRef.current=false;setProcessing(true);
     const previousMuted=video.muted;video.pause();video.muted=true;
     let skipped=project.skipped||0;\n    let nextIndex=start;
     const initial={...project,status:"processing" as const,plannedTimestamps:plan,nextIndex:start,skipped};
@@ -247,7 +239,7 @@ export default function App() {
       await saveProject(latest).catch(()=>undefined);setProject(latest);
       if(!(error instanceof Error&&error.message.includes("storage is full")))setNotice(error instanceof Error?error.message:"Extraction stopped. Your saved progress is available.");
     }finally{
-      activeRef.current=false;setProcessing(false);cancelRef.current=false;video.pause();video.muted=previousMuted;
+      setProcessing(false);cancelRef.current=false;video.pause();video.muted=previousMuted;
       await reloadProjects();
     }
   }
