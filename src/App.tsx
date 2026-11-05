@@ -59,6 +59,7 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
+    if (navigator.storage?.persist) void navigator.storage.persist();
     loadStoredFrames().then((stored) => {
       if (!active || !stored.length) return;
       const restored: Frame[] = stored.map((frame) => ({
@@ -236,7 +237,7 @@ export default function App() {
     try {
       const zip = new JSZip();
       selected.forEach((frame, index) => {
-        const extension = format === "image/png" ? "png" : "jpg";
+        const extension = frame.format === "image/png" ? "png" : "jpg";
         const timestamp = formatTime(frame.timestamp, true).replaceAll(":", "-").replace(".", "-");
         zip.file(`frame-${String(index + 1).padStart(3, "0")}-${timestamp}.${extension}`, frame.blob);
       });
