@@ -34,7 +34,6 @@ export default function App() {
   const [mode, setMode] = useState<Mode>("interval");
   const [interval, setInterval] = useState(2);
   const [targetCount, setTargetCount] = useState(15);
-  const [blurFilter, setBlurFilter] = useState(false);
   const [format, setFormat] = useState("image/jpeg");
   const [quality, setQuality] = useState(0.88);
   const [customTime, setCustomTime] = useState("");
@@ -147,7 +146,7 @@ export default function App() {
         canvas.height = height;
         context.drawImage(video, 0, 0, width, height);
         const sharpness = calculateSharpness(canvas);
-        if (blurFilter && sharpness < 13) {
+        if (sharpness < 13) {
           skipped += 1;
           setProgress((current) => ({ ...current, done: index + 1, skipped }));
           continue;
@@ -169,7 +168,7 @@ export default function App() {
         await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       }
       if (cancelRef.current) setNotice(`Extraction stopped. ${results.length} frame(s) were kept.`);
-      else if (results.length === 0) setNotice("No frames were extracted. Try disabling the blur filter.");
+      else if (results.length === 0) setNotice("No sufficiently sharp frames were found. Try a different video or a wider capture interval.");
       else setNotice(`Finished. ${results.length} frame(s) extracted.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Something went wrong while extracting frames.");
@@ -303,7 +302,7 @@ export default function App() {
             </div>
 
             <div className="options-row">
-              <label className="toggle-line"><span><Sparkles size={16} /><span><b>Skip blurry frames</b><small>Best-effort sharpness detection</small></span></span><input type="checkbox" checked={blurFilter} onChange={(event) => setBlurFilter(event.target.checked)} /></label>
+              <div className="toggle-line"><span><Sparkles size={16} /><span><b>Automatic clarity filter</b><small>Always enabled · blurry frames are discarded automatically</small></span></span><span className="ready-tag"><Check size={13} /> ON</span></div>
             </div>
 
             <div className="format-grid">
