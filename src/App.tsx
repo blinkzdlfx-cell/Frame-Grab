@@ -46,6 +46,9 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [previewFrame, setPreviewFrame] = useState<Frame | null>(null);
   const [zipping, setZipping] = useState(false);
+  const [batchExport, setBatchExport] = useState<Frame[][]>([]);
+  const [batchStatuses, setBatchStatuses] = useState<Record<number, "ready" | "downloading" | "downloaded">>({});
+  const [batchProgress, setBatchProgress] = useState("");
 
   const timestamps = useMemo(() => {
     const base = getFrameTimestamps(duration, mode, interval, targetCount);
@@ -96,6 +99,8 @@ export default function App() {
   }, []);
 
   function clearFrames() {
+    setBatchExport([]);
+    setBatchStatuses({});
     framesRef.current.forEach((frame) => URL.revokeObjectURL(frame.url));
     setFrames([]);
     void clearStoredFrames().catch(() => setNotice("Could not clear the locally saved gallery."));
@@ -209,6 +214,8 @@ export default function App() {
   }
 
   function toggleFrame(id: string) {
+    setBatchExport([]);
+    setBatchStatuses({});
     const frame = framesRef.current.find((item) => item.id === id);
     if (!frame) return;
     const selected = !frame.selected;
@@ -217,6 +224,8 @@ export default function App() {
   }
 
   function setAllFramesSelected(selected: boolean) {
+    setBatchExport([]);
+    setBatchStatuses({});
     setFrames((current) => current.map((frame) => ({ ...frame, selected })));
     void Promise.all(framesRef.current.map((frame) => updateStoredFrameSelection(frame.id, selected)));
   }
@@ -230,31 +239,77 @@ export default function App() {
     link.remove();
   }
 
+  function triggerZipDownload(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  function addFramesToZip(zip: JSZip, batch: Frame[]) {
+    batch.forEach((frame, index) => {
+      const extension = frame.format === "image/png" ? "png" : "jpg";
+      const timestamp = formatTime(frame.timestamp, true).replaceAll(":", "-").replace(".", "-");
+      zip.file(`frame-${String(index + 1).padStart(3, "0")}-${timestamp}.${extension}`, frame.blob);
+    });
+  }
+
   async function downloadZip() {
     const selected = frames.filter((frame) => frame.selected);
     if (!selected.length || zipping) return;
+    if (selected.length > 25) {
+      const batches: Frame[][] = [];
+      for (let index = 0; index < selected.length; index += 25) batches.push(selected.slice(index, index + 25));
+      setBatchExport(batches);
+      setBatchStatuses({});
+      setNotice(`${batches.length} smaller ZIP batches are ready. Download them one at a time to keep memory use low.`);
+      return;
+    }
     setZipping(true);
+    setBatchProgress("Preparing ZIP…");
     try {
       const zip = new JSZip();
-      selected.forEach((frame, index) => {
-        const extension = frame.format === "image/png" ? "png" : "jpg";
-        const timestamp = formatTime(frame.timestamp, true).replaceAll(":", "-").replace(".", "-");
-        zip.file(`frame-${String(index + 1).padStart(3, "0")}-${timestamp}.${extension}`, frame.blob);
-      });
-      const blob = await zip.generateAsync({ type: "blob", compression: "STORE", streamFiles: true });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `framegrab-${selected.length}-frames.zip`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      addFramesToZip(zip, selected);
+      const blob = await zip.generateAsync(
+        { type: "blob", compression: "STORE", streamFiles: true },
+        (metadata) => setBatchProgress(`Generating ZIP · ${Math.round(metadata.percent)}%`)
+      );
+      triggerZipDownload(blob, `framegrab-${selected.length}-frames.zip`);
       setNotice(`ZIP prepared with ${selected.length} images. If the download does not start, allow downloads for this site and try again.`);
     } catch {
       setNotice("Could not create the ZIP file. Try downloading fewer images.");
     } finally {
       setZipping(false);
+      setBatchProgress("");
+    }
+  }
+
+  async function downloadBatch(batchIndex: number) {
+    const batch = batchExport[batchIndex];
+    if (!batch || zipping) return;
+    setZipping(true);
+    setBatchStatuses((current) => ({ ...current, [batchIndex]: "downloading" }));
+    setBatchProgress(`Preparing batch ${batchIndex + 1} of ${batchExport.length}…`);
+    try {
+      const zip = new JSZip();
+      addFramesToZip(zip, batch);
+      const blob = await zip.generateAsync(
+        { type: "blob", compression: "STORE", streamFiles: true },
+        (metadata) => setBatchProgress(`Batch ${batchIndex + 1} of ${batchExport.length} · ${Math.round(metadata.percent)}%`)
+      );
+      triggerZipDownload(blob, `framegrab-batch-${String(batchIndex + 1).padStart(2, "0")}-of-${batchExport.length}-${batch.length}-frames.zip`);
+      setBatchStatuses((current) => ({ ...current, [batchIndex]: "downloaded" }));
+      setNotice(`Batch ${batchIndex + 1} downloaded. Continue with the next batch when ready.`);
+    } catch {
+      setBatchStatuses((current) => ({ ...current, [batchIndex]: "ready" }));
+      setNotice(`Batch ${batchIndex + 1} failed. Select Retry to generate it again.`);
+    } finally {
+      setZipping(false);
+      setBatchProgress("");
     }
   }
 
@@ -371,8 +426,10 @@ export default function App() {
           <section className="gallery-section">
             <div className="gallery-header">
               <div><span className="step-number">03</span><div><h2>Your screenshots</h2><p>{frames.length} captured · {selectedCount} selected</p></div></div>
-              <div className="gallery-actions"><button className="secondary-button" onClick={() => setAllFramesSelected(true)}><CheckCheck size={14} /> Select all</button><button className="secondary-button" onClick={() => setAllFramesSelected(false)}>Clear selection</button><button className="secondary-button" onClick={clearFrames}>Delete gallery</button><button className="download-button" disabled={!selectedCount || zipping} onClick={downloadZip}>{zipping ? <LoaderCircle className="spin" size={15} /> : <Archive size={15} />} Download ZIP ({selectedCount})</button></div>
+              <div className="gallery-actions"><button className="secondary-button" onClick={() => setAllFramesSelected(true)}><CheckCheck size={14} /> Select all</button><button className="secondary-button" onClick={() => setAllFramesSelected(false)}>Clear selection</button><button className="secondary-button" onClick={clearFrames}>Delete gallery</button><button className="download-button" disabled={!selectedCount || zipping} onClick={downloadZip}>{zipping ? <LoaderCircle className="spin" size={15} /> : <Archive size={15} />} {selectedCount > 25 ? `Prepare batches (${selectedCount})` : `Download ZIP (${selectedCount})`}</button></div>
             </div>
+            {zipping && <div className="panel mb-4 p-4 text-sm text-slate-300" role="status"><div className="flex items-center gap-2"><LoaderCircle className="spin" size={16} />{batchProgress || "Preparing download…"}</div></div>}
+            {batchExport.length > 0 && <div className="panel mb-5 p-4 sm:p-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold text-slate-100">Batch downloads</h3><p className="text-sm text-slate-400">25 images per ZIP · Generate one at a time to reduce memory use.</p></div><button className="text-button" onClick={() => { setBatchExport([]); setBatchStatuses({}); }}>Close</button></div><div className="grid gap-2 sm:grid-cols-2">{batchExport.map((batch, index) => { const status = batchStatuses[index] ?? "ready"; return <div key={index} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"><div><strong className="block text-sm text-slate-100">Batch {index + 1} of {batchExport.length}</strong><span className="text-xs text-slate-400">{batch.length} images · {status === "downloaded" ? "Download started" : status === "downloading" ? "Generating…" : "Ready to download"}</span></div><button className="secondary-button shrink-0" disabled={zipping} onClick={() => void downloadBatch(index)}>{status === "downloaded" ? "Download again" : status === "downloading" ? <LoaderCircle className="spin" size={14} /> : status === "ready" ? "Download batch" : "Retry"}</button></div>; })}</div></div>}
             <div className="frames-grid">
               {frames.map((frame, index) => (
                 <article className={`frame-card ${frame.selected ? "is-selected" : ""}`} key={frame.id}>
