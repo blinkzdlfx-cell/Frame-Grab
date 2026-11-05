@@ -64,7 +64,7 @@ function openDatabase(): Promise<IDBDatabase> {
         const row = cursor.value as StoredFrame & { projectId?: string; index?: number };
         if (!row.projectId) {
           row.projectId = "legacy-recovered";
-          row.index = row.index ?? 0;
+          row.index = row.index ?? Math.round(row.timestamp * 1000);
           cursor.update(row);
         }
         cursor.continue();
@@ -116,7 +116,7 @@ export async function listProjects(): Promise<StoredProject[]> {
       req.onsuccess = () => resolve(req.result as StoredProject[]);
       req.onerror = () => reject(req.error);
     });
-    return result.sort((a,b) => b.updatedAt-a.updatedAt);
+    return result.map(project => { const { sourceBlob: _sourceBlob, ...metadata } = project; return metadata; }).sort((a,b) => b.updatedAt-a.updatedAt);
   });
 }
 export async function getProject(id: string): Promise<StoredProject | undefined> {
