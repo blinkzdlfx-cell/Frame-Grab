@@ -206,7 +206,8 @@ export default function App() {
     if(!plan.length)return;
     cancelRef.current=false;setProcessing(true);
     const previousMuted=video.muted;video.pause();video.muted=true;
-    let skipped=project.skipped||0;\n    let nextIndex=start;
+    let skipped=project.skipped||0;
+    let nextIndex=start;
     const initial={...project,settings,duration,width:dimensions.width,height:dimensions.height,status:"processing" as const,plannedTimestamps:plan,nextIndex:start,skipped};
     setProject(initial);
     try{await saveProject(initial);}catch(error){setNotice(storageMessage(error));}
