@@ -200,10 +200,16 @@ export default function LayoutStudio() {
   function clearSource() {
     if (videoRef.current) {
       videoRef.current.pause();
+      videoRef.current.onloadedmetadata = null;
+      videoRef.current.onerror = null;
+      videoRef.current.onended = null;
       videoRef.current.removeAttribute("src");
       videoRef.current.load();
     }
+    const previousSource = sourceRef.current;
+    if (previousSource instanceof ImageBitmap) previousSource.close();
     sourceRef.current = null;
+    setVideoPlaying(false);
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     objectUrlRef.current = "";
     setFile(null);
@@ -389,7 +395,7 @@ export default function LayoutStudio() {
     <section className="layout-workspace">
       <aside className="layout-controls panel">
         <div className="layout-section-title"><span>01</span><div><strong>Media source</strong><small>Images and videos from your device</small></div></div>
-        <input ref={fileInputRef} className="layout-file-input" type="file" accept={ACCEPTED_FILES} onChange={event => { const selected = event.target.files?.[0]; event.currentTarget.value = ""; void loadMedia(selected); }}/>
+        <input ref={fileInputRef} className="layout-file-input" type="file" accept={`image/*,video/*,${ACCEPTED_FILES}`} onChange={event => { const selected = event.target.files?.[0]; event.currentTarget.value = ""; void loadMedia(selected); }}/>
         {!file ? <button className={`layout-dropzone ${dragging ? "is-dragging" : ""}`} onClick={() => fileInputRef.current?.click()} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); void loadMedia(event.dataTransfer.files[0]); }}>
           <span className="layout-upload-icon"><UploadCloud size={25}/></span>
           <strong>{loading ? "Opening media…" : "Drop an image or video here"}</strong>
