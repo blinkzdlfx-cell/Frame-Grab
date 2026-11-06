@@ -135,3 +135,5 @@ footer span:first-child{font:700 10px "Space Grotesk",sans-serif;letter-spacing:
 .app-navigation button{display:flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid transparent;border-radius:8px;background:transparent;color:#8290a8;font-size:10px;white-space:nowrap}
 .app-navigation button.active{border-color:#7378ed55;background:#6366f119;color:#c7d2fe}
 @media(max-width:480px){.topbar-inner{padding:0 12px}.app-navigation{gap:2px}.app-navigation button{gap:4px;padding:6px 7px;font-size:8px}.privacy-pill{display:none}}
+
+.app-page-hidden{display:none}

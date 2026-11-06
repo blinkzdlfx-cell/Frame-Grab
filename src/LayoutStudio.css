@@ -91,3 +91,5 @@
 
 
 .layout-export-button:disabled{filter:grayscale(.35);opacity:.45;cursor:not-allowed}
+
+.layout-export-canvas{position:absolute;width:1px;height:1px;left:-10000px;opacity:0;pointer-events:none}

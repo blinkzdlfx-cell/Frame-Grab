@@ -167,7 +167,7 @@ function downloadBlob(blob: Blob, name: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
-export default function LayoutStudio() {
+export default function LayoutStudio({ active = true }: { active?: boolean }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
@@ -277,7 +277,7 @@ export default function LayoutStudio() {
 
   useEffect(() => {
     let frame = 0;
-    if (!file) return;
+    if (!file || (!active && !exporting)) return;
     const render = () => {
       const source = sourceRef.current;
       if (source) {
@@ -296,7 +296,11 @@ export default function LayoutStudio() {
     };
     frame = window.requestAnimationFrame(render);
     return () => window.cancelAnimationFrame(frame);
-  }, [mode, settings, compare, file, videoReady]);
+  }, [mode, settings, compare, file, videoReady, active, exporting]);
+
+  useEffect(() => {
+    if (!active && !exporting) videoRef.current?.pause();
+  }, [active, exporting]);
 
   useEffect(() => () => {
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
@@ -455,7 +459,7 @@ export default function LayoutStudio() {
             {file && <button onClick={() => fileInputRef.current?.click()}><UploadCloud size={14}/> Replace</button>}
           </div>
         </div>
-        {compare ? <div className="layout-comparison-grid">{modes.map((item, index) => <article key={item.id} className="layout-comparison-card"><div><strong>{item.label}</strong><small>{item.id === mode ? "Current selection" : "Alternative layout"}</small></div><canvas ref={element => { comparisonRefs.current[index] = element; }} width="1920" height="1080" aria-label={item.label}/></article>)}</div> : <div className="layout-canvas-stage"><canvas ref={previewRef} width="1920" height="1080" aria-label="16 by 9 media composition preview"/>{!file && <div className="layout-canvas-empty"><span><ImageIcon size={30}/></span><strong>Your composition appears here</strong><small>Upload an image or video to start creating.</small></div>}{file && kind === "video" && <><button className="layout-video-toggle" onClick={() => { const video = videoRef.current; if (!video) return; if (video.paused) void video.play(); else video.pause(); }} aria-label={videoPlaying ? "Pause video preview" : "Play video preview"}>{videoPlaying ? "Pause preview" : <><Play size={14}/> Play preview</>}</button><span className="layout-preview-hint">Preview playback · Export renders the full clip</span></>}</div>}
+        {compare ? <><canvas ref={previewRef} className="layout-export-canvas" width="1920" height="1080" aria-hidden="true"/><div className="layout-comparison-grid">{modes.map((item, index) => <article key={item.id} className="layout-comparison-card"><div><strong>{item.label}</strong><small>{item.id === mode ? "Current selection" : "Alternative layout"}</small></div><canvas ref={element => { comparisonRefs.current[index] = element; }} width="1920" height="1080" aria-label={item.label}/></article>)}</div></> : <div className="layout-canvas-stage"><canvas ref={previewRef} width="1920" height="1080" aria-label="16 by 9 media composition preview"/>{!file && <div className="layout-canvas-empty"><span><ImageIcon size={30}/></span><strong>Your composition appears here</strong><small>Upload an image or video to start creating.</small></div>}{file && kind === "video" && <><button className="layout-video-toggle" onClick={() => { const video = videoRef.current; if (!video) return; if (video.paused) void video.play(); else video.pause(); }} aria-label={videoPlaying ? "Pause video preview" : "Play video preview"}>{videoPlaying ? "Pause preview" : <><Play size={14}/> Play preview</>}</button><span className="layout-preview-hint">Preview playback · Export renders the full clip</span></>}</div>}
         <div className="layout-preview-footer"><span>{file ? file.name : "No media selected"}</span><span>{kind === "video" ? "Video composition" : kind === "image" ? "Image composition" : "Waiting for media"}</span></div>
       </section>
     </section>
