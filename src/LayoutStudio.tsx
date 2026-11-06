@@ -219,6 +219,10 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
 
   async function loadMedia(nextFile?: File) {
     if (!nextFile) return;
+    if (exporting) {
+      setNotice("Stop the current video export before changing media.");
+      return;
+    }
     const nextKind = detectKind(nextFile);
     if (!nextKind) {
       setNotice("This file type is not in the supported image or video list.");
@@ -342,8 +346,11 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
     recorder.ondataavailable = event => { if (event.data.size) chunksRef.current.push(event.data); };
     recorder.onerror = () => {
       setExporting(false);
+      video.pause();
       setNotice("Video recording failed. Try a shorter clip or another browser.");
       canvasStream.getTracks().forEach(track => track.stop());
+      sourceStream?.getTracks().forEach(track => track.stop());
+      recorderRef.current = null;
     };
     recorder.onstop = () => {
       if (!chunksRef.current.length) {
@@ -409,8 +416,8 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
         </button> : <div className="layout-source-card">
           <div className="layout-source-preview">{kind === "video" ? <FileVideo2 size={25}/> : <FileImage size={25}/>}</div>
           <div className="layout-source-meta"><strong title={file.name}>{file.name}</strong><small>{kind === "image" ? "Image" : "Video"} · {(file.size / 1024 / 1024).toFixed(2)} MB</small></div>
-          <button className="layout-icon-button" onClick={clearSource} aria-label="Remove media"><X size={17}/></button>
-          <button className="layout-change-source" onClick={() => fileInputRef.current?.click()}>Change media</button>
+          <button className="layout-icon-button" disabled={exporting} onClick={clearSource} aria-label="Remove media"><X size={17}/></button>
+          <button className="layout-change-source" disabled={exporting} onClick={() => fileInputRef.current?.click()}>Change media</button>
         </div>}
         {loading && <p className="layout-loading"><LoaderCircle size={14}/> Decoding media locally…</p>}
         <video ref={videoRef} className="layout-hidden-video" playsInline preload="metadata" onPlay={() => setVideoPlaying(true)} onPause={() => setVideoPlaying(false)} onLoadedData={() => setVideoReady(true)}/>
@@ -456,7 +463,7 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
           <div><span className="layout-live-dot"/><strong>Live composition</strong><small>16:9 · 1920 × 1080 master</small></div>
           <div className="layout-preview-actions">
             <button className={compare ? "active" : ""} onClick={() => setCompare(value => !value)} disabled={!file || loading || !videoReady}><Columns3 size={14}/> Compare</button>
-            {file && <button onClick={() => fileInputRef.current?.click()}><UploadCloud size={14}/> Replace</button>}
+            {file && <button disabled={exporting} onClick={() => fileInputRef.current?.click()}><UploadCloud size={14}/> Replace</button>}
           </div>
         </div>
         {compare ? <><canvas ref={previewRef} className="layout-export-canvas" width="1920" height="1080" aria-hidden="true"/><div className="layout-comparison-grid">{modes.map((item, index) => <article key={item.id} className="layout-comparison-card"><div><strong>{item.label}</strong><small>{item.id === mode ? "Current selection" : "Alternative layout"}</small></div><canvas ref={element => { comparisonRefs.current[index] = element; }} width="1920" height="1080" aria-label={item.label}/></article>)}</div></> : <div className="layout-canvas-stage"><canvas ref={previewRef} width="1920" height="1080" aria-label="16 by 9 media composition preview"/>{!file && <div className="layout-canvas-empty"><span><ImageIcon size={30}/></span><strong>Your composition appears here</strong><small>Upload an image or video to start creating.</small></div>}{file && kind === "video" && <><button className="layout-video-toggle" onClick={() => { const video = videoRef.current; if (!video) return; if (video.paused) void video.play(); else video.pause(); }} aria-label={videoPlaying ? "Pause video preview" : "Play video preview"}>{videoPlaying ? "Pause preview" : <><Play size={14}/> Play preview</>}</button><span className="layout-preview-hint">Preview playback · Export renders the full clip</span></>}</div>}
