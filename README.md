@@ -12,7 +12,7 @@ Select a video, choose an extraction method, review the captured frames, and dow
 - Adjust blur, background darkness, scale, crop position, zoom, sidebar headline, caption, and accent theme with a live preview.
 - Compare all three composition methods side by side.
 - Export still images as PNG, JPEG, or WebP; render video compositions locally as WebM with source audio when browser capture APIs expose it.
-- Accept common image extensions including JPEG, PNG, WebP, AVIF, GIF, BMP, SVG, TIFF, and HEIC/HEIF; actual decoding depends on browser support. Unsupported codecs or image formats show a clear error.
+- Accept common image extensions including JPEG/JPG/JFIF, PNG/APNG, WebP, AVIF, GIF, BMP, ICO, SVG, TIFF, and HEIC/HEIF; actual decoding depends on browser support. Unsupported codecs or image formats show a clear error.
 
 
 ### Video extraction

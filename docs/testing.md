@@ -34,7 +34,7 @@ Video format support depends on the browser's decoder and the codecs inside the 
 ## Video Layout Studio
 
 - [ ] Open Video Layout Studio from the application navigation without losing the extractor workflow.
-- [ ] Load JPEG, PNG, WebP, AVIF, GIF, BMP, and SVG images on browsers that support their decoders.
+- [ ] Load JPEG/JPG/JFIF, PNG/APNG, WebP, AVIF, GIF, BMP, ICO, and SVG images on browsers that support their decoders.
 - [ ] Try TIFF and HEIC/HEIF files; confirm supported browsers decode them and unsupported browsers show a useful message.
 - [ ] Drag and drop an image and a video; verify the file picker and drag/drop use the same validation.
 - [ ] Adjust blur, darkness, background scale, and foreground scale; verify the live 16:9 preview updates.
