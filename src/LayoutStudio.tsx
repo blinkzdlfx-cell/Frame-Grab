@@ -64,6 +64,7 @@ function drawComposition(canvas: HTMLCanvasElement, source: DrawableMedia, mode:
   if (!ctx) return;
   const width = canvas.width;
   const height = canvas.height;
+  const mediaSize = dimensionsOf(source);
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#050914";
   ctx.fillRect(0, 0, width, height);
@@ -125,8 +126,8 @@ function drawComposition(canvas: HTMLCanvasElement, source: DrawableMedia, mode:
   ctx.fillStyle = palette.accent;
   ctx.font = "600 20px sans-serif";
   ctx.fillText("MEDIA DETAILS", width - sideWidth + 36, 58);
-  const labels = ["SOURCE", "FORMAT", "CANVAS"];
-  const values = ["LOCAL MEDIA", "9:16 → 16:9", "1920 × 1080"];
+  const labels = ["SOURCE", "MEDIA SIZE", "OUTPUT"];
+  const values = ["LOCAL FILE", `${mediaSize.width} × ${mediaSize.height}`, "1920 × 1080"];
   labels.forEach((label, index) => {
     const y = 150 + index * 105;
     ctx.fillStyle = "#94a3b8";
