@@ -12,6 +12,8 @@ import {
   saveSourceVideo, updateFrameSelection, type ProjectSettings, type StoredFrame, type StoredProject
 } from "./lib/storage";
 
+import LayoutStudio from "./LayoutStudio";
+
 type Frame = StoredFrame & { url: string };
 const defaultSettings: ProjectSettings = { mode: "interval", interval: 2, targetCount: 15, format: "image/jpeg", quality: .88, customTimes: [] };
 const makeId = () => `project-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -20,6 +22,7 @@ const storageMessage = (error: unknown) => error instanceof Error ? error.messag
 const projectSummary = (p:StoredProject):StoredProject => { const copy={...p}; delete copy.sourceBlob; return copy; };
 
 export default function App() {
+  const [activePage, setActivePage] = useState<"extractor" | "layout">("extractor");
   const videoRef=useRef<HTMLVideoElement>(null), canvasRef=useRef<HTMLCanvasElement>(null), fileInputRef=useRef<HTMLInputElement>(null);
   const cancelRef=useRef(false), previewTouch=useRef<{x:number;y:number}|null>(null), resumeRef=useRef(false);
   const [projects,setProjects]=useState<StoredProject[]>([]);
@@ -275,8 +278,8 @@ export default function App() {
   const progressPercent=progress.total?Math.round(progress.done/progress.total*100):0;
 
   return <div className="min-h-screen text-slate-100">
-    <header className="topbar"><div className="topbar-inner"><a className="brand" href="/" aria-label="FrameGrab home"><span className="brand-mark"><Film size={21}/></span><span><strong>FrameGrab</strong><small>BY BRILINA DEV</small></span></a><div className="privacy-pill"><span className="live-dot"/><span>100% on-device processing</span></div></div></header>
-    <main className="app-shell">
+    <header className="topbar"><div className="topbar-inner"><a className="brand" href="/" aria-label="FrameGrab home"><span className="brand-mark"><Film size={21}/></span><span><strong>FrameGrab</strong><small>BY BRILINA DEV</small></span></a><nav className="app-navigation" aria-label="Main navigation"><button className={activePage === "extractor" ? "active" : ""} onClick={() => setActivePage("extractor")}><Scissors size={14}/> Frame Extractor</button><button className={activePage === "layout" ? "active" : ""} onClick={() => setActivePage("layout")}><ImageIcon size={14}/> Video Layout Studio</button></nav><div className="privacy-pill"><span className="live-dot"/><span>100% on-device processing</span></div></div></header>
+    {activePage === "extractor" ? <main className="app-shell">
       <section className="hero"><div className="eyebrow"><Sparkles size={14}/> SIMPLE. PRIVATE. PRECISE.</div><h1>Every moment,<br/><span>captured perfectly.</span></h1><p>Turn any video into a collection of high-quality screenshots. No uploads, no accounts, no waiting for a server.</p></section>
       <section className="panel p-4 sm:p-5 mb-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3"><div className="flex items-center gap-2"><FolderOpen size={17} className="text-indigo-300"/><strong className="text-sm">Your projects</strong><span className="text-xs text-slate-500">{projects.length} saved</span></div><button className="secondary-button" onClick={()=>fileInputRef.current?.click()}><Plus size={14}/> New project</button></div>
@@ -309,10 +312,10 @@ export default function App() {
       </section>}
       {!file&&<section className="trust-row"><div><ShieldCheck size={17}/><span><b>Private by design</b><small>Your files never leave your device</small></span></div><div><Zap size={17}/><span><b>Fast local processing</b><small>No upload or server queue</small></span></div><div><Archive size={17}/><span><b>Easy export</b><small>Save images individually or as ZIP</small></span></div></section>}
       <footer><span>FRAMEGRAB · BRILINA DEV</span><span>Private video frame extraction · Built for your browser</span></footer>
-    </main>
-    {currentFrame&&<div className="preview-overlay" onClick={()=>setPreviewIndex(null)}><div className="preview-dialog" onClick={e=>e.stopPropagation()} onTouchStart={e=>{previewTouch.current={x:e.touches[0].clientX,y:e.touches[0].clientY};}} onTouchEnd={e=>{if(!previewTouch.current)return;const dx=e.changedTouches[0].clientX-previewTouch.current.x,dy=e.changedTouches[0].clientY-previewTouch.current.y;if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy))setPreviewIndex(i=>i===null?null:Math.max(0,Math.min(frames.length-1,i+(dx<0?1:-1))));previewTouch.current=null;}}><div className="preview-toolbar"><span>{formatTime(currentFrame.timestamp,true)} <small>· {currentFrame.width} × {currentFrame.height} · {(previewIndex??0)+1}/{frames.length}</small></span><div><button onClick={()=>downloadFrame(currentFrame)}><ArrowDownToLine size={15}/> Save image</button><button className="close-preview" onClick={()=>setPreviewIndex(null)} aria-label="Close preview"><X size={20}/></button></div></div><div className="flex items-center justify-between gap-3 min-h-0 flex-1"><button className="secondary-button" disabled={previewIndex===0} onClick={()=>setPreviewIndex(i=>i===null?null:Math.max(0,i-1))}>← Previous</button><img src={currentFrame.url} alt="Full-size extracted video frame"/><button className="secondary-button" disabled={previewIndex===frames.length-1} onClick={()=>setPreviewIndex(i=>i===null?null:Math.min(frames.length-1,i+1))}>Next →</button></div></div></div>}
-    {notice&&<div className="toast" role="status"><span><Check size={15}/></span>{notice}<button onClick={()=>setNotice("")} aria-label="Dismiss"><X size={14}/></button></div>}
-    {restoring&&<div className="fixed bottom-3 right-3 text-xs text-slate-500">Restoring local workspace…</div>}
+    </main> : <LayoutStudio />}
+    {activePage === "extractor" && currentFrame&&<div className="preview-overlay" onClick={()=>setPreviewIndex(null)}><div className="preview-dialog" onClick={e=>e.stopPropagation()} onTouchStart={e=>{previewTouch.current={x:e.touches[0].clientX,y:e.touches[0].clientY};}} onTouchEnd={e=>{if(!previewTouch.current)return;const dx=e.changedTouches[0].clientX-previewTouch.current.x,dy=e.changedTouches[0].clientY-previewTouch.current.y;if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy))setPreviewIndex(i=>i===null?null:Math.max(0,Math.min(frames.length-1,i+(dx<0?1:-1))));previewTouch.current=null;}}><div className="preview-toolbar"><span>{formatTime(currentFrame.timestamp,true)} <small>· {currentFrame.width} × {currentFrame.height} · {(previewIndex??0)+1}/{frames.length}</small></span><div><button onClick={()=>downloadFrame(currentFrame)}><ArrowDownToLine size={15}/> Save image</button><button className="close-preview" onClick={()=>setPreviewIndex(null)} aria-label="Close preview"><X size={20}/></button></div></div><div className="flex items-center justify-between gap-3 min-h-0 flex-1"><button className="secondary-button" disabled={previewIndex===0} onClick={()=>setPreviewIndex(i=>i===null?null:Math.max(0,i-1))}>← Previous</button><img src={currentFrame.url} alt="Full-size extracted video frame"/><button className="secondary-button" disabled={previewIndex===frames.length-1} onClick={()=>setPreviewIndex(i=>i===null?null:Math.min(frames.length-1,i+1))}>Next →</button></div></div></div>}
+    {activePage === "extractor" && notice&&<div className="toast" role="status"><span><Check size={15}/></span>{notice}<button onClick={()=>setNotice("")} aria-label="Dismiss"><X size={14}/></button></div>}
+    {activePage === "extractor" && restoring&&<div className="fixed bottom-3 right-3 text-xs text-slate-500">Restoring local workspace…</div>}
     <canvas ref={canvasRef} className="hidden"/>
   </div>;
 }

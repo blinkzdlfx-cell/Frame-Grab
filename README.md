@@ -6,6 +6,15 @@ Select a video, choose an extraction method, review the captured frames, and dow
 
 ## Features
 
+### Video Layout Studio
+- Compose still images and videos into 16:9 widescreen layouts.
+- Choose blurred background, crop and zoom, or multi-panel sidebar compositions.
+- Adjust blur, background darkness, scale, crop position, zoom, sidebar headline, caption, and accent theme with a live preview.
+- Compare all three composition methods side by side.
+- Export still images as PNG, JPEG, or WebP; render video compositions locally as WebM with source audio when browser capture APIs expose it.
+- Accept common image extensions including JPEG, PNG, WebP, AVIF, GIF, BMP, SVG, TIFF, and HEIC/HEIF; actual decoding depends on browser support. Unsupported codecs or image formats show a clear error.
+
+
 ### Video extraction
 - Local video preview and metadata detection
 - Extract frames at a time interval or target frame count
