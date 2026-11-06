@@ -5,6 +5,8 @@
 - React + TypeScript + Vite provide the client application.
 - HTMLVideoElement decodes the selected local file; HTMLCanvasElement captures frames.
 - JSZip packages selected images locally.
+- The Video Layout Studio uses Canvas 2D for local 16:9 composition and MediaRecorder/canvas capture streams for WebM export. It does not send media to the Worker or a remote service.
+- Image decoding uses browser-native decoders (ImageBitmap with an HTML image fallback); accepted extensions are not a guarantee that every browser can decode every format. GIF export is a still composition; video codec and audio-track capture support vary by browser.
 - Cloudflare Workers serves static assets only. Video and screenshot processing never pass through the Worker.
 - IndexedDB stores project metadata, settings, recovery checkpoints, screenshot Blobs, and a temporary source-video Blob while a project is a draft or extraction is active/paused.
 - A completed project's source-video Blob is automatically removed. Screenshots and project metadata remain available.
