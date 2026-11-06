@@ -82,9 +82,6 @@
 .layout-comparison-card canvas{aspect-ratio:16/9;border-radius:6px;background:#050914}
 .layout-notice{position:fixed;z-index:70;bottom:20px;left:50%;transform:translateX(-50%);max-width:min(560px,calc(100vw - 28px));display:flex;align-items:center;gap:12px;padding:11px 13px;background:#1b2940;border:1px solid #6474aa77;box-shadow:0 12px 40px #0008;border-radius:10px;color:#e8edf8;font-size:10px;line-height:1.5}
 .layout-notice button{display:grid;place-items:center;flex:none;border:0;background:transparent;color:#9ba8bd}
-.app-navigation{display:flex;align-items:center;gap:5px}
-.app-navigation button{display:flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid transparent;border-radius:8px;background:transparent;color:#8290a8;font-size:10px;white-space:nowrap}
-.app-navigation button.active{border-color:#7378ed55;background:#6366f119;color:#c7d2fe}
 @media(min-width:1100px){.layout-comparison-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:900px){.layout-studio-heading{align-items:flex-start;flex-direction:column}.layout-workspace{grid-template-columns:1fr}.layout-preview-panel{position:static;grid-row:1}.layout-controls{grid-row:2}}
 @media(max-width:620px){.layout-studio-shell{padding:25px 14px 40px}.layout-studio-heading{margin-bottom:18px}.layout-studio-heading p{font-size:11px}.layout-heading-actions{width:100%;justify-content:space-between}.layout-controls,.layout-preview-panel{padding:13px}.layout-preview-toolbar{align-items:flex-start;flex-direction:column}.layout-preview-toolbar>div:first-child{flex-wrap:wrap}.layout-preview-toolbar small{width:100%;padding-left:15px}.layout-preview-actions{width:100%}.layout-preview-actions button{flex:1;justify-content:center}.layout-preview-footer{font-size:8px}.layout-canvas-empty strong{font-size:11px}.layout-canvas-empty small{font-size:8px}.layout-comparison-grid{grid-template-columns:1fr}}
@@ -92,6 +89,5 @@
 
 .layout-video-toggle{position:absolute;left:12px;bottom:42px;display:flex;align-items:center;gap:6px;padding:8px 11px;border:1px solid #ffffff30;border-radius:8px;background:#4338ca;color:#fff;font-size:10px;font-weight:600;z-index:2}.layout-video-toggle:hover{background:#4f46e5}.layout-preview-hint{bottom:12px}
 
-@media(max-width:480px){.topbar-inner{padding:0 12px}.app-navigation{gap:2px}.app-navigation button{gap:4px;padding:6px 7px;font-size:8px}.privacy-pill{display:none}}
 
 .layout-export-button:disabled{filter:grayscale(.35);opacity:.45;cursor:not-allowed}
