@@ -23,6 +23,7 @@ Select a video, choose an extraction method, review the captured frames, and dow
 - Extract and save frames as JPEG, PNG, or WebP, with adjustable JPEG/WebP quality
 - Export selected gallery images in their original formats or convert the entire ZIP to JPEG, PNG, or WebP
 - Use descriptive filenames containing the project name, frame number, timestamp, and image dimensions
+- WebP export uses adjustable high-quality lossy compression; use PNG when pixel-perfect lossless output is required.
 - Sequential processing with progress reporting and cancellation
 
 ### Projects and gallery
