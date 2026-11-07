@@ -9,8 +9,12 @@ Run `npm run typecheck` and `npm run build` before deployment.
 - [ ] Extract with target-count mode; confirm the requested count.
 - [ ] Add custom timestamps and verify they are included once and sorted.
 - [ ] Toggle blur filtering and compare skipped-frame metrics.
-- [ ] Export JPEG at more than one quality setting.
+- [ ] Extract as JPEG, PNG, and WebP; confirm each actual MIME type and file extension.
+- [ ] Export JPEG and WebP at more than one quality setting.
 - [ ] Export PNG and confirm file extension and format.
+- [ ] Export a ZIP in Original, JPEG, PNG, and WebP modes; verify every file's extension and actual image format.
+- [ ] Confirm exported filenames include the project name, frame number, timestamp, and dimensions.
+- [ ] Confirm unsupported WebP encoding shows a clear error instead of creating a mislabeled file.
 - [ ] Select/deselect individual frames and download one image.
 - [ ] Download a ZIP and inspect its contents.
 - [ ] Cancel an extraction and confirm already captured frames remain usable.
