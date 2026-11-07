@@ -17,7 +17,7 @@ import LayoutStudio from "./LayoutStudio";
 type Frame = StoredFrame & { url: string };
 const defaultSettings: ProjectSettings = { mode: "interval", interval: 2, targetCount: 15, format: "image/jpeg", quality: .88, customTimes: [] };
 const formatExtension = (mime: string) => mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
-const safeSlug = (value: string) => value.toLowerCase().normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "framegrab";
+const safeSlug = (value: string) => value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "framegrab";
 const frameFilename = (frame: StoredFrame, title: string, mime = frame.format) =>
   `${safeSlug(title)}-frame-${String(frame.index + 1).padStart(3, "0")}-at-${formatTime(frame.timestamp, true).replace(/[:.]/g, "-")}-${frame.width}x${frame.height}.${formatExtension(mime)}`;
 async function convertFrameBlob(frame: Frame, mime: string, quality: number): Promise<Blob> {
