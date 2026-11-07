@@ -16,6 +16,25 @@ import LayoutStudio from "./LayoutStudio";
 
 type Frame = StoredFrame & { url: string };
 const defaultSettings: ProjectSettings = { mode: "interval", interval: 2, targetCount: 15, format: "image/jpeg", quality: .88, customTimes: [] };
+const formatExtension = (mime: string) => mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
+const safeSlug = (value: string) => value.toLowerCase().normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "framegrab";
+const frameFilename = (frame: StoredFrame, title: string, mime = frame.format) =>
+  `${safeSlug(title)}-frame-${String(frame.index + 1).padStart(3, "0")}-at-${formatTime(frame.timestamp, true).replace(/[:.]/g, "-")}-${frame.width}x${frame.height}.${formatExtension(mime)}`;
+async function convertFrameBlob(frame: Frame, mime: string, quality: number): Promise<Blob> {
+  if (mime === "original" || mime === frame.format) return frame.blob;
+  if (typeof createImageBitmap !== "function") throw new Error("This browser cannot convert images during export. Choose Original format or use a supported browser.");
+  const bitmap = await createImageBitmap(frame.blob);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = frame.width; canvas.height = frame.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not prepare an image for conversion.");
+    context.drawImage(bitmap, 0, 0);
+    const converted = await canvasToBlob(canvas, mime, mime === "image/png" ? 1 : quality);
+    if (converted.type !== mime) throw new Error(`This browser does not support ${mime === "image/webp" ? "WebP" : mime} export. Choose another format.`);
+    return converted;
+  } finally { bitmap.close(); }
+}
 const makeId = () => `project-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
 const safeTitle = (name: string) => name.replace(/\.[^.]+$/, "").replace(/[_-]+/g," ").trim() || "Untitled project";
 const storageMessage = (error: unknown) => error instanceof Error ? error.message : "Browser storage is unavailable. Your current session can continue, but recovery may not be possible.";
@@ -36,6 +55,7 @@ export default function App() {
   const [progress,setProgress]=useState({done:0,total:0,skipped:0,time:0,status:""});
   const [notice,setNotice]=useState(""), [storage,setStorage]=useState<{usage?:number;quota?:number;persistent?:boolean}>({});
   const [previewIndex,setPreviewIndex]=useState<number|null>(null), [zipping,setZipping]=useState(false);
+  const [exportFormat,setExportFormat]=useState("original"), [exportQuality,setExportQuality]=useState(.95);
   const [restoring,setRestoring]=useState(true);
   const framesRef=useRef<Frame[]>([]);
   const timestamps=useMemo(()=>[...new Set([...getFrameTimestamps(duration,settings.mode,settings.interval,settings.targetCount),...settings.customTimes])].filter(t=>t>=0&&t<duration).sort((a,b)=>a-b),[duration,settings]);
@@ -229,7 +249,8 @@ export default function App() {
           const checkpoint={...initial,nextIndex:index+1,skipped,status:"processing" as const};
           await saveProject(checkpoint);setProject(checkpoint);
         }else{
-          const blob=await canvasToBlob(canvas,settings.format,settings.format==="image/jpeg"?settings.quality:1);
+          const blob=await canvasToBlob(canvas,settings.format,settings.format==="image/png"?1:settings.quality);
+          if(blob.type!==settings.format) throw new Error(`This browser cannot create ${settings.format==="image/webp"?"WebP":settings.format==="image/png"?"PNG":"JPEG"} images. Choose another extraction format.`);
           const stored:StoredFrame={id:`${project.id}:${index}`,projectId:project.id,index,timestamp,blob,width,height,sharpness,selected:true,format:settings.format};
           const checkpoint={...initial,nextIndex:index+1,skipped,status:"processing" as const};
           try{await saveFrameAndCheckpoint(stored,checkpoint);}
@@ -260,17 +281,22 @@ export default function App() {
     }
   }
   function downloadFrame(frame:Frame){
-    const a=document.createElement("a");a.href=frame.url;a.download=`framegrab-${formatTime(frame.timestamp).replaceAll(":","-")}-${Math.round(frame.timestamp*1000)}ms.${frame.format==="image/png"?"png":"jpg"}`;
+    const a=document.createElement("a");a.href=frame.url;a.download=frameFilename(frame,project?.title||"framegrab");
     document.body.appendChild(a);a.click();a.remove();
   }
   async function downloadZip(){
     const chosen=frames.filter(f=>f.selected);if(!chosen.length||zipping)return;
     setZipping(true);
     try{
-      const zip=new JSZip(),folder=zip.folder((project?.title||"FrameGrab project").replace(/[\\/:*?"<>|]/g,"-"))!;
-      chosen.forEach((f,i)=>folder.file(`frame-${String(i+1).padStart(3,"0")}-${formatTime(f.timestamp,true).replaceAll(":","-").replace(".","-")}.${f.format==="image/png"?"png":"jpg"}`,f.blob));
+      const title=project?.title||"FrameGrab project";
+      const zip=new JSZip(),folder=zip.folder(safeSlug(title))!;
+      for(const frame of chosen){
+        const outputFormat=exportFormat==="original"?frame.format:exportFormat;
+        const blob=await convertFrameBlob(frame,outputFormat,exportQuality);
+        folder.file(frameFilename(frame,title,outputFormat),blob);
+      }
       const blob=await zip.generateAsync({type:"blob",compression:"STORE",streamFiles:true});
-      const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`${(project?.title||"framegrab").replace(/[\\/:*?"<>|]/g,"-")}-screenshots.zip`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+      const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`${safeSlug(title)}-screenshots.zip`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
     }catch(error){setNotice(error instanceof Error?error.message:"Could not create the ZIP. Try fewer images.");}
     finally{setZipping(false);}
   }
@@ -301,13 +327,14 @@ export default function App() {
           {settings.mode==="interval"?<div className="range-block"><div className="range-heading"><label>Capture every</label><strong>{settings.interval.toFixed(1)} seconds</strong></div><input type="range" min="0.5" max="30" step="0.5" value={settings.interval} onChange={e=>setSettings(s=>({...s,interval:Number(e.target.value)}))}/><div className="range-hints"><span>0.5s · More frames</span><span>30s · Fewer frames</span></div></div>:<div className="range-block"><div className="range-heading"><label>Number of screenshots</label><strong>{settings.targetCount} frames</strong></div><input type="range" min="5" max="100" step="5" value={settings.targetCount} onChange={e=>setSettings(s=>({...s,targetCount:Number(e.target.value)}))}/><div className="range-hints"><span>5 frames</span><span>100 frames</span></div></div>}
           <div className="custom-time"><div><label>Specific timestamp <span>Optional</span></label><p>Add an exact moment in seconds</p></div><div className="custom-time-control"><input type="number" min="0" max={duration||undefined} step=".1" placeholder="e.g. 12.5" value={customTime} onChange={e=>setCustomTime(e.target.value)} disabled={!file||!duration}/><button onClick={addCustomTime} disabled={!file||!duration}><Plus size={15}/> Add</button></div>{settings.customTimes.length>0&&<div className="timestamp-chips">{settings.customTimes.map(t=><button key={t} onClick={()=>setSettings(s=>({...s,customTimes:s.customTimes.filter(x=>x!==t)}))}>{formatTime(t,true)} <X size={11}/></button>)}</div>}</div>
           <div className="options-row"><div className="toggle-line"><span><Sparkles size={16}/><span><b>Automatic clarity filter</b><small>Blurry frames are discarded automatically</small></span></span><span className="ready-tag"><Check size={13}/> ON</span></div></div>
-          <div className="format-grid"><div><label className="setting-label" htmlFor="format">Image format</label><select id="format" value={settings.format} onChange={e=>setSettings(s=>({...s,format:e.target.value}))}><option value="image/jpeg">JPEG · Smaller files</option><option value="image/png">PNG · Lossless</option></select></div><div><label className="setting-label" htmlFor="quality">JPEG quality <strong>{Math.round(settings.quality*100)}%</strong></label><input id="quality" type="range" min=".5" max="1" step=".05" value={settings.quality} disabled={settings.format!=="image/jpeg"} onChange={e=>setSettings(s=>({...s,quality:Number(e.target.value)}))}/></div></div>
+          <div className="format-grid"><div><label className="setting-label" htmlFor="format">Extraction image format</label><select id="format" value={settings.format} onChange={e=>setSettings(s=>({...s,format:e.target.value}))}><option value="image/jpeg">JPEG · Smaller files</option><option value="image/png">PNG · Lossless</option><option value="image/webp">WebP · Lightweight</option></select></div><div><label className="setting-label" htmlFor="quality">{settings.format==="image/png"?"PNG quality":settings.format==="image/webp"?"WebP quality":"JPEG quality"} <strong>{Math.round(settings.quality*100)}%</strong></label><input id="quality" type="range" min=".5" max="1" step=".05" value={settings.quality} disabled={settings.format==="image/png"} onChange={e=>setSettings(s=>({...s,quality:Number(e.target.value)}))}/></div></div>
           <button className="primary-button" disabled={!file||!duration||processing||!timestamps.length} onClick={()=>void extractFrames(project?.status==="paused"||project?.status==="processing")}>{processing?<><LoaderCircle className="spin" size={17}/> Extracting…</>:<><Scissors size={17}/> {project?.status==="paused"?"Resume extraction":project?.status==="completed"?"Extract again":`Extract ${timestamps.length} screenshots`} <ArrowDownToLine size={16}/></>}</button>
           <p className="settings-footnote"><LockKeyhole size={13}/> Files are processed locally. Nothing is uploaded.</p>
         </div>
       </section>
       {processing&&<section className="panel progress-panel"><div className="progress-title"><div><LoaderCircle className="spin accent-icon" size={20}/><span><strong>Extracting your frames</strong><small>{progress.status}</small></span></div><button className="cancel-button" onClick={()=>{cancelRef.current=true;}}>Pause</button></div><div className="progress-track"><div style={{width:`${progressPercent}%`}}/></div><div className="progress-stats"><span>{progress.done} / {progress.total} processed</span><span>{progress.skipped} blurry skipped</span><span>{formatTime(progress.time)}</span></div></section>}
       {frames.length>0&&<section className="gallery-section"><div className="gallery-header"><div><span className="step-number">03</span><div><h2>{project?.title||"Your screenshots"}</h2><p>{frames.length} captured · {selectedCount} selected</p></div></div><div className="gallery-actions"><button className="secondary-button" onClick={()=>void setAllSelected(true)}><CheckCheck size={14}/> Select all</button><button className="secondary-button" onClick={()=>void setAllSelected(false)}>Clear selection</button><button className="download-button" disabled={!selectedCount||zipping} onClick={()=>void downloadZip()}>{zipping?<LoaderCircle className="spin" size={15}/>:<Archive size={15}/>} Download ZIP ({selectedCount})</button></div></div>
+        <div className="format-grid export-format-controls"><div><label className="setting-label" htmlFor="export-format">ZIP image format</label><select id="export-format" value={exportFormat} onChange={e=>setExportFormat(e.target.value)}><option value="original">Keep original formats</option><option value="image/jpeg">Convert all to JPEG</option><option value="image/png">Convert all to PNG</option><option value="image/webp">Convert all to WebP</option></select></div><div><label className="setting-label" htmlFor="export-quality">JPEG / WebP quality <strong>{Math.round(exportQuality*100)}%</strong></label><input id="export-quality" type="range" min=".5" max="1" step=".05" value={exportQuality} disabled={exportFormat==="original"||exportFormat==="image/png"} onChange={e=>setExportQuality(Number(e.target.value))}/><small className="settings-footnote">WebP uses high-quality lossy compression; PNG preserves pixels without lossy compression.</small></div></div>
         <div className="frames-grid">{frames.map((frame,index)=><article className={`frame-card ${frame.selected?"is-selected":""}`} key={frame.id}><button className="frame-image" onClick={()=>setPreviewIndex(index)} aria-label={`Preview frame at ${formatTime(frame.timestamp)}`}><img src={frame.url} alt={`Video frame at ${formatTime(frame.timestamp)}`} loading="lazy"/><span className="frame-time">{formatTime(frame.timestamp,true)}</span></button><div className="frame-meta"><label><input type="checkbox" checked={frame.selected} onChange={()=>void toggleFrame(frame.id)}/><span>Frame {String(index+1).padStart(2,"0")}</span></label><div className="flex gap-2"><button title="Download image" onClick={()=>downloadFrame(frame)}><ArrowDownToLine size={15}/></button><button title="Delete image" onClick={()=>void deleteImage(frame)}><Trash2 size={15}/></button></div></div></article>)}</div>
       </section>}
       {!file&&<section className="trust-row"><div><ShieldCheck size={17}/><span><b>Private by design</b><small>Your files never leave your device</small></span></div><div><Zap size={17}/><span><b>Fast local processing</b><small>No upload or server queue</small></span></div><div><Archive size={17}/><span><b>Easy export</b><small>Save images individually or as ZIP</small></span></div></section>}
