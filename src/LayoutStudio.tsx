@@ -9,6 +9,29 @@ import "./LayoutStudio.css";
 type MediaKind = "image" | "video";
 type LayoutMode = "blur" | "crop" | "sidebar";
 type DrawableMedia = CanvasImageSource & { width?: number; height?: number; videoWidth?: number; videoHeight?: number };
+type EnhancementSettings = { strength: number; sharpness: number; clarity: number; noiseReduction: number; contrast: number };
+
+function enhanceCanvas(canvas: HTMLCanvasElement, settings: EnhancementSettings) {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx || settings.strength <= 0 || settings.sharpness <= 0) return;
+  const { width, height } = canvas;
+  const image = ctx.getImageData(0, 0, width, height);
+  const source = image.data;
+  const output = new Uint8ClampedArray(source);
+  const amount = (settings.sharpness / 100) * (settings.strength / 100) * 1.15;
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      const i = (y * width + x) * 4;
+      for (let channel = 0; channel < 3; channel += 1) {
+        const neighbors = source[i - 4 + channel] + source[i + 4 + channel] + source[i - width * 4 + channel] + source[i + width * 4 + channel];
+        const sharpened = source[i + channel] + (source[i + channel] * 4 - neighbors) * amount;
+        output[i + channel] = Math.max(0, Math.min(255, sharpened));
+      }
+    }
+  }
+  image.data.set(output);
+  ctx.putImageData(image, 0, 0);
+}
 
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".apng", ".webp", ".avif", ".gif", ".bmp", ".ico", ".svg", ".tif", ".tiff", ".heic", ".heif"];
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v", ".ogv", ".ogg", ".avi", ".mkv", ".3gp"];
@@ -59,7 +82,7 @@ function drawContain(ctx: CanvasRenderingContext2D, source: DrawableMedia, width
 function drawComposition(canvas: HTMLCanvasElement, source: DrawableMedia, mode: LayoutMode, settings: {
   blur: number; darken: number; backgroundScale: number; foregroundScale: number;
   zoom: number; panY: number; headline: string; caption: string; sidebarTheme: string;
-}) {
+}, enhancement: EnhancementSettings) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const width = canvas.width;
@@ -68,6 +91,8 @@ function drawComposition(canvas: HTMLCanvasElement, source: DrawableMedia, mode:
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#050914";
   ctx.fillRect(0, 0, width, height);
+  const strength = enhancement.strength / 100;
+  const filter = `contrast(${100 + enhancement.contrast * strength + enhancement.clarity * strength * 0.35}%) saturate(${100 + enhancement.clarity * strength * 0.2}%) blur(${(enhancement.noiseReduction * strength) / 500}px)`;
 
   if (mode === "blur") {
     ctx.save();
@@ -76,12 +101,18 @@ function drawComposition(canvas: HTMLCanvasElement, source: DrawableMedia, mode:
     ctx.restore();
     ctx.fillStyle = `rgba(0, 0, 0, ${settings.darken / 100})`;
     ctx.fillRect(0, 0, width, height);
+    ctx.save(); ctx.filter = filter;
     drawContain(ctx, source, width, height, settings.foregroundScale / 100);
+    ctx.restore();
+    if (!(source instanceof HTMLVideoElement)) enhanceCanvas(canvas, enhancement);
     return;
   }
 
   if (mode === "crop") {
+    ctx.save(); ctx.filter = filter;
     drawCover(ctx, source, width, height, settings.zoom / 100, settings.panY);
+    ctx.restore();
+    if (!(source instanceof HTMLVideoElement)) enhanceCanvas(canvas, enhancement);
     return;
   }
 
@@ -109,8 +140,10 @@ function drawComposition(canvas: HTMLCanvasElement, source: DrawableMedia, mode:
   ctx.beginPath();
   ctx.rect(sideWidth, 0, mediaWidth, height);
   ctx.clip();
+  ctx.filter = filter;
   drawContain(ctx, source, mediaWidth, height);
   ctx.restore();
+  if (!(source instanceof HTMLVideoElement)) enhanceCanvas(canvas, enhancement);
 
   ctx.textAlign = "left";
   ctx.fillStyle = palette.accent;
@@ -181,6 +214,7 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
   const [kind, setKind] = useState<MediaKind | null>(null);
   const [mode, setMode] = useState<LayoutMode>("blur");
   const [compare, setCompare] = useState(false);
+  const [enhancement, setEnhancement] = useState<EnhancementSettings>({ strength: 40, sharpness: 45, clarity: 35, noiseReduction: 10, contrast: 12 });
   const [settings, setSettings] = useState({
     blur: 28, darken: 22, backgroundScale: 185, foregroundScale: 100,
     zoom: 115, panY: 50, headline: "LIVE HIGHLIGHTS",
@@ -287,21 +321,21 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
       const source = sourceRef.current;
       if (source) {
         if (!(source instanceof HTMLVideoElement) || source.readyState >= 2) {
-          if (previewRef.current) drawComposition(previewRef.current, source, mode, settings);
+          if (previewRef.current) drawComposition(previewRef.current, source, mode, settings, enhancement);
           if (compare) {
             const comparisonModes: LayoutMode[] = ["blur", "crop", "sidebar"];
             comparisonModes.forEach((item, index) => {
               const canvas = comparisonRefs.current[index];
-              if (canvas) drawComposition(canvas, source, item, settings);
+              if (canvas) drawComposition(canvas, source, item, settings, enhancement);
             });
           }
         }
       }
-      frame = window.requestAnimationFrame(render);
+      if (source instanceof HTMLVideoElement) frame = window.requestAnimationFrame(render);
     };
     frame = window.requestAnimationFrame(render);
     return () => window.cancelAnimationFrame(frame);
-  }, [mode, settings, compare, file, videoReady, active, exporting]);
+  }, [mode, settings, enhancement, compare, file, videoReady, active, exporting]);
 
   useEffect(() => {
     if (!active && !exporting) videoRef.current?.pause();
@@ -389,6 +423,7 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
       caption: "Vertical content, composed for widescreen.", sidebarTheme: "slate"
     });
     setMode("blur");
+    setEnhancement({ strength: 40, sharpness: 45, clarity: 35, noiseReduction: 10, contrast: 12 });
   }
 
   return <main className="layout-studio-shell">
@@ -451,8 +486,19 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
           <label className="layout-text-setting"><span>Sidebar accent</span><select value={settings.sidebarTheme} onChange={event => updateSetting("sidebarTheme", event.target.value)}><option value="slate">Indigo / slate</option><option value="cyan">Cyan</option><option value="violet">Violet</option></select></label>
         </div>}
         <div className="layout-divider"/>
+        <div className="layout-section-title"><span>04</span><div><strong>Quality enhancement</strong><small>Improve detail before exporting</small></div></div>
+        <div className="layout-enhancement-panel">
+          <label className="layout-range"><span>Enhancement strength <b>{enhancement.strength}%</b></span><input type="range" min="0" max="100" value={enhancement.strength} onChange={event => setEnhancement(value => ({ ...value, strength: Number(event.target.value) }))}/><small className="layout-enhancement-hint">0% keeps the original appearance. Higher values apply stronger adjustments.</small></label>
+          <label className="layout-range"><span>Sharpness <b>{enhancement.sharpness}%</b></span><input type="range" min="0" max="100" value={enhancement.sharpness} onChange={event => setEnhancement(value => ({ ...value, sharpness: Number(event.target.value) }))}/></label>
+          <label className="layout-range"><span>Clarity <b>{enhancement.clarity}%</b></span><input type="range" min="0" max="100" value={enhancement.clarity} onChange={event => setEnhancement(value => ({ ...value, clarity: Number(event.target.value) }))}/></label>
+          <label className="layout-range"><span>Noise reduction <b>{enhancement.noiseReduction}%</b></span><input type="range" min="0" max="100" value={enhancement.noiseReduction} onChange={event => setEnhancement(value => ({ ...value, noiseReduction: Number(event.target.value) }))}/></label>
+          <label className="layout-range"><span>Contrast <b>{enhancement.contrast}%</b></span><input type="range" min="0" max="100" value={enhancement.contrast} onChange={event => setEnhancement(value => ({ ...value, contrast: Number(event.target.value) }))}/></label>
+          <button className="layout-enhancement-reset" onClick={() => setEnhancement({ strength: 40, sharpness: 45, clarity: 35, noiseReduction: 10, contrast: 12 })}><RotateCcw size={12}/> Reset enhancement</button>
+          {kind === "video" && <small className="layout-enhancement-hint">Sharpness processing is applied to still-image compositions. Video preview uses real-time clarity and contrast adjustments to keep playback responsive.</small>}
+        </div>
+        <div className="layout-divider"/>
         <div className="layout-export-block">
-          <div className="layout-section-title"><span>04</span><div><strong>Export</strong><small>{kind === "video" ? "Render a new widescreen video" : "Save your finished composition"}</small></div></div>
+          <div className="layout-section-title"><span>05</span><div><strong>Export</strong><small>{kind === "video" ? "Render a new widescreen video" : "Save your finished composition"}</small></div></div>
           {kind === "image" && <label className="layout-text-setting"><span>Image format</span><select value={outputFormat} onChange={event => setOutputFormat(event.target.value)}><option value="image/png">PNG · High quality</option><option value="image/jpeg">JPEG · Smaller file</option><option value="image/webp">WebP · Modern format</option></select></label>}
           {!file ? <p className="layout-export-note">Choose media to enable export.</p> : kind === "image" ? <button className="layout-export-button" disabled={loading || !videoReady} onClick={() => void exportImage()}><ArrowDownToLine size={16}/> Export image</button> : exporting ? <button className="layout-export-button is-recording" onClick={stopExport}>Stop recording</button> : <button className="layout-export-button" disabled={loading || !videoReady} onClick={() => void exportVideo()}><Video size={16}/> Export video</button>}
           {kind === "video" && <p className="layout-export-note">Video exports as WebM. Audio is included when the browser exposes the source audio track. Keep this tab open until recording finishes.</p>}
