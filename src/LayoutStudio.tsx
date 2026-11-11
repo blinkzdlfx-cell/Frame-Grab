@@ -331,7 +331,7 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
           const activeEnhancement = previewOriginal ? { strength: 0, sharpness: 0, clarity: 0, noiseReduction: 0, contrast: 0 } : enhancement;
           if (previewRef.current) drawComposition(previewRef.current, source, mode, settings, activeEnhancement);
           if (compare) {
-            const comparisonModes: LayoutMode[] = ["blur", "crop", "sidebar"];
+            const comparisonModes: LayoutMode[] = ["original", "blur", "crop", "sidebar"];
             comparisonModes.forEach((item, index) => {
               const canvas = comparisonRefs.current[index];
               if (canvas) drawComposition(canvas, source, item, settings, activeEnhancement);
