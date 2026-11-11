@@ -214,6 +214,7 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
   const [kind, setKind] = useState<MediaKind | null>(null);
   const [mode, setMode] = useState<LayoutMode>("blur");
   const [compare, setCompare] = useState(false);
+  const [previewOriginal, setPreviewOriginal] = useState(false);
   const [enhancement, setEnhancement] = useState<EnhancementSettings>({ strength: 40, sharpness: 45, clarity: 35, noiseReduction: 10, contrast: 12 });
   const [settings, setSettings] = useState({
     blur: 28, darken: 22, backgroundScale: 185, foregroundScale: 100,
@@ -321,12 +322,13 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
       const source = sourceRef.current;
       if (source) {
         if (!(source instanceof HTMLVideoElement) || source.readyState >= 2) {
-          if (previewRef.current) drawComposition(previewRef.current, source, mode, settings, enhancement);
+          const activeEnhancement = previewOriginal ? { strength: 0, sharpness: 0, clarity: 0, noiseReduction: 0, contrast: 0 } : enhancement;
+          if (previewRef.current) drawComposition(previewRef.current, source, mode, settings, activeEnhancement);
           if (compare) {
             const comparisonModes: LayoutMode[] = ["blur", "crop", "sidebar"];
             comparisonModes.forEach((item, index) => {
               const canvas = comparisonRefs.current[index];
-              if (canvas) drawComposition(canvas, source, item, settings, enhancement);
+              if (canvas) drawComposition(canvas, source, item, settings, activeEnhancement);
             });
           }
         }
@@ -335,7 +337,7 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
     };
     frame = window.requestAnimationFrame(render);
     return () => window.cancelAnimationFrame(frame);
-  }, [mode, settings, enhancement, compare, file, videoReady, active, exporting]);
+  }, [mode, settings, enhancement, previewOriginal, compare, file, videoReady, active, exporting]);
 
   useEffect(() => {
     if (!active && !exporting) videoRef.current?.pause();
@@ -350,7 +352,9 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
 
   async function exportImage() {
     const canvas = previewRef.current;
-    if (!canvas || !file || kind !== "image") return;
+    const source = sourceRef.current;
+    if (!canvas || !file || kind !== "image" || !source) return;
+    drawComposition(canvas, source, mode, settings, enhancement);
     const mime = outputFormat;
     const extension = mime === "image/jpeg" ? "jpg" : mime === "image/webp" ? "webp" : "png";
     const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error("The browser could not export this image.")), mime, 0.92));
@@ -509,7 +513,8 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
         <div className="layout-preview-toolbar">
           <div><span className="layout-live-dot"/><strong>Live composition</strong><small>16:9 · 1920 × 1080 master</small></div>
           <div className="layout-preview-actions">
-            <button className={compare ? "active" : ""} onClick={() => setCompare(value => !value)} disabled={!file || loading || !videoReady}><Columns3 size={14}/> Compare</button>
+            {kind === "image" && <button className={previewOriginal ? "active" : ""} onClick={() => setPreviewOriginal(value => !value)} disabled={!file || loading || !videoReady}>{previewOriginal ? "Show enhanced" : "Show original"}</button>}
+            <button className={compare ? "active" : ""} onClick={() => setCompare(value => !value)} disabled={!file || loading || !videoReady}><Columns3 size={14}/> Compare layouts</button>
             {file && <button disabled={exporting} onClick={() => fileInputRef.current?.click()}><UploadCloud size={14}/> Replace</button>}
           </div>
         </div>
