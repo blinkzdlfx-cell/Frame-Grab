@@ -93,3 +93,9 @@
 .layout-export-button:disabled{filter:grayscale(.35);opacity:.45;cursor:not-allowed}
 
 .layout-export-canvas{position:absolute;width:1px;height:1px;left:-10000px;opacity:0;pointer-events:none}
+
+.layout-enhancement-panel{display:grid;gap:13px;padding:13px;background:linear-gradient(145deg,#111b30,#0b1221);border:1px solid #34415b;border-radius:11px}
+.layout-enhancement-panel .layout-range{gap:7px}
+.layout-enhancement-hint{display:block;color:#71809a;font-size:9px;line-height:1.55}
+.layout-enhancement-reset{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px;border:1px solid #3b4a68;border-radius:8px;background:#172238;color:#c7d2fe;font-size:10px}
+.layout-enhancement-reset:hover{border-color:#818cf8;background:#202c47}

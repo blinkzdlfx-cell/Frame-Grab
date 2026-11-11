@@ -10,6 +10,7 @@ Select a video, choose an extraction method, review the captured frames, and dow
 - Compose still images and videos into 16:9 widescreen layouts.
 - Choose blurred background, crop and zoom, or multi-panel sidebar compositions.
 - Adjust blur, background darkness, scale, crop position, zoom, sidebar headline, caption, and accent theme with a live preview.
+- Enhance still-image compositions with adjustable strength, sharpness, clarity, noise reduction, and contrast; compare the original and enhanced preview before exporting.
 - Compare all three composition methods side by side.
 - Export still images as PNG, JPEG, or WebP; render video compositions locally as WebM with source audio when browser capture APIs expose it.
 - Accept common image extensions including JPEG/JPG/JFIF, PNG/APNG, WebP, AVIF, GIF, BMP, ICO, SVG, TIFF, and HEIC/HEIF; actual decoding depends on browser support. Unsupported codecs or image formats show a clear error.
