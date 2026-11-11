@@ -7,7 +7,7 @@ import {
 import "./LayoutStudio.css";
 
 type MediaKind = "image" | "video";
-type LayoutMode = "blur" | "crop" | "sidebar";
+type LayoutMode = "original" | "blur" | "crop" | "sidebar";
 type DrawableMedia = CanvasImageSource & { width?: number; height?: number; videoWidth?: number; videoHeight?: number };
 type EnhancementSettings = { strength: number; sharpness: number; clarity: number; noiseReduction: number; contrast: number };
 
@@ -37,6 +37,7 @@ const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".apng", ".w
 const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v", ".ogv", ".ogg", ".avi", ".mkv", ".3gp"];
 const ACCEPTED_FILES = [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS].join(",");
 const modes: { id: LayoutMode; label: string; description: string }[] = [
+  { id: "original", label: "Original image", description: "Show the source image without layout effects or enhancement." },
   { id: "blur", label: "Blurred background", description: "Fill the widescreen canvas with a softened copy behind your original media." },
   { id: "crop", label: "Crop & zoom", description: "Fill the entire frame and control which part of the original media stays visible." },
   { id: "sidebar", label: "Multi-panel", description: "Keep the original composition centred and use side panels for extra context." }
@@ -91,6 +92,11 @@ function drawComposition(canvas: HTMLCanvasElement, source: DrawableMedia, mode:
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#050914";
   ctx.fillRect(0, 0, width, height);
+  if (mode === "original") {
+    drawContain(ctx, source, width, height);
+    return;
+  }
+
   const strength = enhancement.strength / 100;
   const filter = `contrast(${100 + enhancement.contrast * strength + enhancement.clarity * strength * 0.35}%) saturate(${100 + enhancement.clarity * strength * 0.2}%) blur(${(enhancement.noiseReduction * strength) / 500}px)`;
 
@@ -474,6 +480,7 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
 
         <div className="layout-divider"/>
         <div className="layout-section-title"><span>03</span><div><strong>Adjustments</strong><small>Fine-tune your composition</small></div></div>
+        {mode === "original" && <p className="layout-export-note">Original view: no crop, blur, filters, sharpening, or enhancement is applied.</p>}
         {mode === "blur" && <div className="layout-adjustments">
           <label className="layout-range"><span>Background blur <b>{settings.blur}px</b></span><input type="range" min="0" max="60" value={settings.blur} onChange={event => updateSetting("blur", Number(event.target.value))}/></label>
           <label className="layout-range"><span>Background darkness <b>{settings.darken}%</b></span><input type="range" min="0" max="80" value={settings.darken} onChange={event => updateSetting("darken", Number(event.target.value))}/></label>
@@ -497,7 +504,7 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
           <label className="layout-range"><span>Clarity <b>{enhancement.clarity}%</b></span><input type="range" min="0" max="100" value={enhancement.clarity} onChange={event => setEnhancement(value => ({ ...value, clarity: Number(event.target.value) }))}/></label>
           <label className="layout-range"><span>Noise reduction <b>{enhancement.noiseReduction}%</b></span><input type="range" min="0" max="100" value={enhancement.noiseReduction} onChange={event => setEnhancement(value => ({ ...value, noiseReduction: Number(event.target.value) }))}/></label>
           <label className="layout-range"><span>Contrast <b>{enhancement.contrast}%</b></span><input type="range" min="0" max="100" value={enhancement.contrast} onChange={event => setEnhancement(value => ({ ...value, contrast: Number(event.target.value) }))}/></label>
-          <button className="layout-enhancement-reset" onClick={() => setEnhancement({ strength: 40, sharpness: 45, clarity: 35, noiseReduction: 10, contrast: 12 })}><RotateCcw size={12}/> Reset enhancement</button>
+          <button className="layout-enhancement-reset" onClick={() => setEnhancement({ strength: 0, sharpness: 0, clarity: 0, noiseReduction: 0, contrast: 0 })}><RotateCcw size={12}/> Clear enhancement</button>
           {kind === "video" && <small className="layout-enhancement-hint">Sharpness processing is applied to still-image compositions. Video preview uses real-time clarity and contrast adjustments to keep playback responsive.</small>}
         </div>
         <div className="layout-divider"/>
@@ -513,6 +520,7 @@ export default function LayoutStudio({ active = true }: { active?: boolean }) {
         <div className="layout-preview-toolbar">
           <div><span className="layout-live-dot"/><strong>Live composition</strong><small>16:9 · 1920 × 1080 master</small></div>
           <div className="layout-preview-actions">
+            {file && <button disabled={exporting || loading} onClick={() => { setMode("original"); setSettings({ blur: 0, darken: 0, backgroundScale: 100, foregroundScale: 100, zoom: 100, panY: 50, headline: "", caption: "", sidebarTheme: "slate" }); setEnhancement({ strength: 0, sharpness: 0, clarity: 0, noiseReduction: 0, contrast: 0 }); setPreviewOriginal(false); setCompare(false); }}><RotateCcw size={14}/> Reset image</button>}
             {kind === "image" && <button className={previewOriginal ? "active" : ""} onClick={() => setPreviewOriginal(value => !value)} disabled={!file || loading || !videoReady}>{previewOriginal ? "Show enhanced" : "Show original"}</button>}
             <button className={compare ? "active" : ""} onClick={() => setCompare(value => !value)} disabled={!file || loading || !videoReady}><Columns3 size={14}/> Compare layouts</button>
             {file && <button disabled={exporting} onClick={() => fileInputRef.current?.click()}><UploadCloud size={14}/> Replace</button>}
